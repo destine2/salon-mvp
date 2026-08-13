@@ -1,0 +1,208 @@
+// Salon MVP — Prisma schema
+// Mirrors the data model in the PRD (section 9) for the management system:
+// booking, payment-integrity checkout, and commission splitting.
+// Provider: PostgreSQL (Supabase or Neon recommended for MVP — see README).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Core tenant
+// ---------------------------------------------------------------------------
+
+model Salon {
+  id        String   @id @default(cuid())
+  name      String
+  city      String?
+  tier      SalonTier @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff          Staff[]
+  customers      Customer[]
+  appointments   Appointment[]
+  products       Product[]
+  services       Service[]
+
+  // Phase 3: multi-branch support hangs off this same Salon model via a
+  // future parentSalonId self-relation — deliberately left out of MVP scope.
+}
+
+enum SalonTier {
+  FREE
+  STARTER
+  GROWTH
+  MULTI_BRANCH
+}
+
+// ---------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------
+
+model Staff {
+  id            String     @id @default(cuid())
+  salonId       String
+  salon         Salon      @relation(fields: [salonId], references: [id])
+  name          String
+  phone         String     @unique // used for OTP login
+  role          StaffRole  @default(STYLIST)
+  paystackSubaccountCode String? // set once the staff member's Paystack subaccount is created
+  createdAt     DateTime   @default(now())
+
+  commissionRule CommissionRule?
+  appointments   Appointment[]
+  transactionSplits TransactionSplit[]
+}
+
+enum StaffRole {
+  OWNER
+  STYLIST
+  APPRENTICE
+}
+
+model CommissionRule {
+  id              String   @id @default(cuid())
+  staffId         String   @unique
+  staff           Staff    @relation(fields: [staffId], references: [id])
+  type            CommissionType @default(PERCENT)
+  value           Decimal  @db.Decimal(10, 2) // percent (e.g. 40.00) or flat naira amount, depending on type
+  isApprenticeStipend Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum CommissionType {
+  PERCENT
+  FLAT
+  CHAIR_RENTAL
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  salonId   String
+  salon     Salon    @relation(fields: [salonId], references: [id])
+  name      String?
+  phone     String   // WhatsApp-identified, not a created account
+  createdAt DateTime @default(now())
+
+  appointments Appointment[]
+
+  @@unique([salonId, phone])
+}
+
+// ---------------------------------------------------------------------------
+// Catalogue
+// ---------------------------------------------------------------------------
+
+model Service {
+  id          String   @id @default(cuid())
+  salonId     String
+  salon       Salon    @relation(fields: [salonId], references: [id])
+  name        String
+  priceNaira  Decimal  @db.Decimal(10, 2)
+  durationMin Int      @default(60)
+
+  appointments Appointment[]
+}
+
+model Product {
+  id                String   @id @default(cuid())
+  salonId           String
+  salon             Salon    @relation(fields: [salonId], references: [id])
+  name              String
+  stockQty          Int      @default(0)
+  lowStockThreshold Int      @default(3)
+  createdAt         DateTime @default(now())
+
+  // Phase 2 — inventory tracking is out of MVP scope but modeled now
+  // so checkout can optionally decrement stock later without a schema change.
+}
+
+// ---------------------------------------------------------------------------
+// Booking
+// ---------------------------------------------------------------------------
+
+model Appointment {
+  id         String   @id @default(cuid())
+  salonId    String
+  salon      Salon    @relation(fields: [salonId], references: [id])
+  staffId    String
+  staff      Staff    @relation(fields: [staffId], references: [id])
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id])
+
+  startTime  DateTime
+  status     AppointmentStatus @default(BOOKED)
+  isWalkIn   Boolean  @default(false)
+
+  // Reminder tracking (Phase 5) — set once each reminder actually sends, so
+  // the reminder cron job never double-sends if it runs more than once.
+  reminder24SentAt DateTime?
+  reminder2SentAt  DateTime?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  transaction Transaction?
+
+  @@index([staffId, startTime])
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CONFIRMED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Payment integrity — the core differentiator (PRD section 5.2)
+// ---------------------------------------------------------------------------
+
+model Transaction {
+  id            String   @id @default(cuid())
+  appointmentId String   @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  amountNaira   Decimal  @db.Decimal(10, 2)
+  method        PaymentMethod
+  paystackRef   String?  // set when method = CARD_TRANSFER and paid via Paystack
+  isFlagged     Boolean  @default(false) // true if appointment was completed without a matching logged payment
+  createdAt     DateTime @default(now())
+
+  splits        TransactionSplit[]
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD_TRANSFER // collected via Paystack in-app charge
+}
+
+// One row per party paid out of a transaction (owner + staff), so both the
+// Paystack-split case (digital) and the manual-ledger case (cash) share the
+// same reporting shape.
+model TransactionSplit {
+  id            String   @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  staffId       String?
+  staff         Staff?   @relation(fields: [staffId], references: [id])
+  recipient     SplitRecipient
+  amountNaira   Decimal  @db.Decimal(10, 2)
+  settledViaPaystack Boolean @default(false)
+}
+
+enum SplitRecipient {
+  OWNER
+  STAFF
+}
