@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { isSlotAvailable } from "@/lib/scheduling";
+import { appointmentEndTime, isSlotConflictError } from "@/lib/overlap";
 
 const EDITABLE_STATUSES = ["BOOKED", "CONFIRMED", "NO_SHOW", "CANCELLED"] as const;
+const SLOT_TAKEN = "That staff member already has an appointment at that time.";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = getSession();
@@ -33,7 +35,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json();
-  const data: { status?: (typeof EDITABLE_STATUSES)[number]; staffId?: string; startTime?: Date } = {};
+  const data: {
+    status?: (typeof EDITABLE_STATUSES)[number];
+    staffId?: string;
+    startTime?: Date;
+    endTime?: Date;
+  } = {};
 
   if (body.status) {
     if (!EDITABLE_STATUSES.includes(body.status)) {
@@ -59,15 +66,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       excludeAppointmentId: appointment.id,
     });
     if (!available) {
-      return NextResponse.json(
-        { ok: false, error: "That staff member already has an appointment at that time." },
-        { status: 409 }
-      );
+      return NextResponse.json({ ok: false, error: SLOT_TAKEN }, { status: 409 });
     }
     data.staffId = newStaffId;
     data.startTime = newStart;
+    // endTime must move with startTime or the stored range — and therefore the
+    // exclusion constraint — would be checked against a stale end.
+    data.endTime = appointmentEndTime(newStart, appointment.service.durationMin);
   }
 
-  const updated = await prisma.appointment.update({ where: { id: params.id }, data });
-  return NextResponse.json({ ok: true, appointment: updated });
+  try {
+    const updated = await prisma.appointment.update({ where: { id: params.id }, data });
+    return NextResponse.json({ ok: true, appointment: updated });
+  } catch (error) {
+    if (isSlotConflictError(error)) {
+      return NextResponse.json({ ok: false, error: SLOT_TAKEN }, { status: 409 });
+    }
+    throw error;
+  }
 }

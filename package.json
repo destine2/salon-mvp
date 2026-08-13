@@ -10,7 +10,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "db:constraints": "psql \"$DATABASE_URL\" -f prisma/sql/001_appointment_no_overlap.sql"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

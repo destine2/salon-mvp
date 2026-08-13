@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { isSlotAvailable } from "@/lib/scheduling";
+import { appointmentEndTime, isSlotConflictError } from "@/lib/overlap";
+
+const SLOT_TAKEN = "That staff member already has an appointment at that time.";
 
 // Owner/staff-side appointment list + creation (walk-ins and manual
 // bookings). The customer-facing WhatsApp-link flow is separate —
@@ -59,18 +62,28 @@ export async function POST(req: NextRequest) {
     create: { salonId: session.salonId, phone: customerPhone, name: customerName ?? null },
   });
 
-  const appointment = await prisma.appointment.create({
-    data: {
-      salonId: session.salonId,
-      staffId,
-      customerId: customer.id,
-      serviceId,
-      startTime: start,
-      isWalkIn: Boolean(isWalkIn),
-      status: isWalkIn ? "CONFIRMED" : "BOOKED",
-    },
-    include: { staff: true, customer: true, service: true },
-  });
-
-  return NextResponse.json({ ok: true, appointment });
+  // Pre-check above is advisory; the exclusion constraint is what actually
+  // prevents two staff booking the same chair at once — including when the
+  // offline queue replays several writes on reconnect.
+  try {
+    const appointment = await prisma.appointment.create({
+      data: {
+        salonId: session.salonId,
+        staffId,
+        customerId: customer.id,
+        serviceId,
+        startTime: start,
+        endTime: appointmentEndTime(start, service.durationMin),
+        isWalkIn: Boolean(isWalkIn),
+        status: isWalkIn ? "CONFIRMED" : "BOOKED",
+      },
+      include: { staff: true, customer: true, service: true },
+    });
+    return NextResponse.json({ ok: true, appointment });
+  } catch (error) {
+    if (isSlotConflictError(error)) {
+      return NextResponse.json({ ok: false, error: SLOT_TAKEN }, { status: 409 });
+    }
+    throw error;
+  }
 }

@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
-
-const ACTIVE_STATUSES = ["BOOKED", "CONFIRMED", "COMPLETED"] as const;
+import { ACTIVE_STATUSES, appointmentEndTime, conflictsWithAny } from "@/lib/overlap";
 
 // Fixed default hours for MVP — every salon is assumed open 9am-7pm local
 // time. Making this per-salon/configurable is a reasonable Phase 2+ add-on
@@ -24,11 +23,13 @@ export function generateDaySlotStarts(date: Date): Date[] {
 
 /**
  * True if staffId has no existing (non-cancelled/no-show) appointment that
- * overlaps [startTime, startTime + durationMin). This is the server-side
- * guard against double-booking — the thing that makes "two staff editing
- * the same slot while offline" resolve to "whoever's write reaches the
- * server first wins" (PRD risk mitigation): the second write just fails
- * this check with a normal error the client can show.
+ * overlaps [startTime, startTime + durationMin).
+ *
+ * This is a PRE-CHECK, not the guarantee. It reads and then the caller writes,
+ * so two concurrent requests can both pass it — the actual protection is the
+ * exclusion constraint in prisma/sql/001_appointment_no_overlap.sql, which
+ * makes the losing write fail. Keep this check anyway: it produces a helpful
+ * 409 in the ordinary case instead of surfacing a database error.
  */
 export async function isSlotAvailable(params: {
   staffId: string;
@@ -51,12 +52,16 @@ export async function isSlotAvailable(params: {
     include: { service: true },
   });
 
-  const newStart = params.startTime.getTime();
-  const newEnd = newStart + params.durationMin * 60_000;
+  const candidate = {
+    start: params.startTime,
+    end: appointmentEndTime(params.startTime, params.durationMin),
+  };
 
-  return !candidates.some((appt) => {
-    const existingStart = appt.startTime.getTime();
-    const existingEnd = existingStart + appt.service.durationMin * 60_000;
-    return newStart < existingEnd && existingStart < newEnd;
-  });
+  return !conflictsWithAny(
+    candidate,
+    candidates.map((appt) => ({
+      start: appt.startTime,
+      end: appointmentEndTime(appt.startTime, appt.service.durationMin),
+    }))
+  );
 }

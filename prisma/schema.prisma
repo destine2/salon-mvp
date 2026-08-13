@@ -140,6 +140,11 @@ model Appointment {
   service    Service  @relation(fields: [serviceId], references: [id])
 
   startTime  DateTime
+  // Denormalized from startTime + service.durationMin at write time. It exists
+  // so the database can enforce non-overlap directly: an exclusion constraint
+  // needs a range, and a range needs an end. Every write path must set it —
+  // see appointmentEndTime() in src/lib/overlap.ts.
+  endTime    DateTime
   status     AppointmentStatus @default(BOOKED)
   isWalkIn   Boolean  @default(false)
 

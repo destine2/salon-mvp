@@ -41,13 +41,24 @@ section 8.2 of that document.
    npx prisma migrate dev --name init
    ```
 
-5. **Seed a test salon + owner** — edit the phone number in `prisma/seed.ts`
+5. **Apply the database constraints** — required, and not optional polish:
+   ```bash
+   npm run db:constraints
+   ```
+   This adds the exclusion constraint that actually prevents two customers
+   being booked into the same stylist and time. Prisma cannot express
+   exclusion constraints, so it will **not** recreate this after a
+   `migrate reset` — re-run it any time you rebuild the database, and on
+   production before the first real booking. Without it the app still
+   *appears* to work: the conflict just happens silently.
+
+6. **Seed a test salon + owner** — edit the phone number in `prisma/seed.ts`
    to your own first, so the OTP actually reaches a phone you can read:
    ```bash
    npm run prisma:seed
    ```
 
-6. **Run it**
+7. **Run it**
    ```bash
    npm run dev
    ```
@@ -142,7 +153,10 @@ checklist below as the real second one.
    (Note: frequent/every-15-minutes cron schedules may require a paid
    Vercel plan; check your plan's cron limits.)
 5. Run your production database's migration: `npx prisma migrate deploy`
-   (not `migrate dev`) against the production `DATABASE_URL`.
+   (not `migrate dev`) against the production `DATABASE_URL`, then apply the
+   constraints with `npm run db:constraints` against that same URL.
+   `migrate deploy` does not create the exclusion constraint — if you skip
+   this, production will accept double bookings silently.
 6. Smoke-test the QA checklist above against the live URL before onboarding
    a real salon.
 
