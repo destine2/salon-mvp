@@ -92,12 +92,25 @@ implemented. Pages (all under `/dashboard` unless noted):
 - **Earnings** (`/dashboard/earnings`) — a staff member's own running total
 - **Reminders** — `/api/cron/send-reminders`, wired to run every 15 minutes
   via `vercel.json` once deployed
-- **Offline** — walk-ins and cash/transfer checkouts queue in IndexedDB
-  (`src/lib/offline-db.ts`, `src/lib/offline-sync.ts`) and auto-sync when
-  connectivity returns; a banner in `src/app/dashboard/layout.tsx` shows
-  pending/offline state
+- **Offline** — two layers. Walk-ins and cash/transfer checkouts queue in
+  IndexedDB (`src/lib/offline-db.ts`, `src/lib/offline-sync.ts`) and auto-sync
+  when connectivity returns, with a banner in `src/app/dashboard/layout.tsx`.
+  A service worker (`public/sw.js`) caches the app shell so the dashboard
+  still *opens* during an outage — without it the queue is useless on a cold
+  load, because the app never renders. `/api` is never cached: stale
+  availability or stale takings would be worse than an honest failure.
+- **Installable** — `public/manifest.webmanifest` lets the dashboard install
+  to an Android home screen with no app-store review
 
 Known gaps worth knowing about before you rely on this:
+- **App icons don't exist yet.** `manifest.webmanifest` points at
+  `/icons/icon-192.png`, `icon-512.png`, and `icon-maskable-512.png`. Until
+  those files are added, Android may not offer the "Add to home screen"
+  prompt. Deliberately left until the product has a name and a mark — the
+  service worker and offline behaviour work regardless.
+- Service worker registration is **production-only** (`register-sw.tsx`), so
+  offline behaviour won't appear under `npm run dev`. Test it with
+  `npm run build && npm start`, then use DevTools → Network → Offline.
 - No reschedule UI on the calendar (the API supports it — `PATCH
   /api/appointments/[id]` with a new `startTime`/`staffId` — just no button yet)
 - Editing a staff member's commission rule doesn't update their existing
@@ -107,15 +120,25 @@ Known gaps worth knowing about before you rely on this:
 - Business hours are hardcoded to 9am–7pm for every salon
   (`src/lib/scheduling.ts` — `BUSINESS_HOURS`)
 
-## Known limitation from this session
+## What has actually been verified
 
-This sandbox's network is locked down and repeatedly timed out installing
-the full `next`/`eslint` dependency tree, so `npm install`, `npx prisma
-validate`, and `npx tsc --noEmit` could not be run here to double-check this
-code end to end — every file was written and reviewed by hand instead
-(relations, imports, exports, and API contracts all cross-checked). Treat
-`npm install` on your own machine as the real first checkpoint, and the QA
-checklist below as the real second one.
+Verified locally, so these are facts rather than intentions:
+
+- `npx tsc --noEmit` — clean
+- `npm run build` — succeeds, all 26 routes generate
+- `npm test` — 20 tests passing (overlap rules, reconciliation logic)
+
+**Not yet verified, because it needs a live database and real accounts:**
+every query path, Paystack test-mode payment, Termii OTP/SMS delivery, the
+offline sync round trip, and the reminder cron. The QA checklist below is
+still the real second checkpoint — nothing here has ever talked to Postgres.
+
+The one thing the build already caught: `/checkout/paystack-callback` used
+`useSearchParams()` without a Suspense boundary, which failed prerendering
+and made `next build` exit non-zero. That would have blocked the Vercel
+deploy outright, on the page Paystack returns customers to after payment.
+Fixed — but it is a good argument for running `npm run build` before every
+deploy rather than trusting `npm run dev`.
 
 ## QA checklist (run this before showing it to a real salon)
 
@@ -127,6 +150,11 @@ checklist below as the real second one.
    dashboard's booking-link line) and book an appointment as a "customer."
 5. Confirm the appointment appears on `/dashboard/calendar`, then try
    booking the exact same slot again — it should be rejected (double-booking guard).
+   Then test the case that actually bites: fire two bookings for the same slot
+   at once and confirm exactly one succeeds and the other gets a 409, not a
+   500. This only works if `npm run db:constraints` has been applied —
+   sequential rejection passes with or without it, so it proves nothing on
+   its own.
 6. Add a walk-in from the calendar page.
 7. Check out one appointment with Cash for less than the service price —
    confirm it shows up flagged on `/dashboard/reports`.

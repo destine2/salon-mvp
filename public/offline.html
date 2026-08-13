@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>You're offline — Salon</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        color: #171310;
+        background: #faf8f4;
+      }
+      .card {
+        max-width: 22rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin: 0 0 0.75rem;
+      }
+      p {
+        line-height: 1.6;
+        margin: 0 0 1rem;
+        color: #5a544c;
+      }
+      button {
+        font: inherit;
+        padding: 0.7rem 1.4rem;
+        border: 1px solid #171310;
+        background: #171310;
+        color: #fff;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>No connection right now</h1>
+      <!-- Reassurance is the point: staff need to know queued work is safe,
+           not just that the network is down. -->
+      <p>
+        Any walk-ins or cash checkouts you already saved are stored on this phone and will
+        sync by themselves once you're back online. Nothing is lost.
+      </p>
+      <p>Pages you've opened before will still work.</p>
+      <button onclick="location.reload()">Try again</button>
+    </div>
+  </body>
+</html>

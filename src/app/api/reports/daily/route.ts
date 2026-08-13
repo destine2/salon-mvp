@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { findIntegrityAnomalies, findUnaccounted } from "@/lib/reconciliation";
 
 // The daily reconciliation summary from PRD 5.2: total booked vs.
 // collected, by method, with flagged (under-collected) entries surfaced.
@@ -43,6 +44,33 @@ export async function GET(req: NextRequest) {
       collected: Number(a.transaction!.amountNaira),
     }));
 
+  // The cash-diversion signature: an appointment whose time has passed that
+  // nobody closed out. Not completed, not marked no-show, no payment — so it
+  // appears in none of the totals above. See src/lib/reconciliation.ts.
+  const reconcilable = appointments.map((a) => ({
+    id: a.id,
+    endTime: a.endTime,
+    status: a.status,
+    servicePriceNaira: Number(a.service.priceNaira),
+    hasTransaction: Boolean(a.transaction),
+    customer: a.customer.name || a.customer.phone,
+    staff: a.staff.name,
+    service: a.service.name,
+    startTime: a.startTime,
+  }));
+
+  const unaccounted = findUnaccounted(reconcilable, new Date());
+  const integrityAnomalies = findIntegrityAnomalies(reconcilable);
+
+  const describe = (a: (typeof reconcilable)[number]) => ({
+    appointmentId: a.id,
+    customer: a.customer,
+    staff: a.staff,
+    service: a.service,
+    startTime: a.startTime,
+    expected: a.servicePriceNaira,
+  });
+
   return NextResponse.json({
     ok: true,
     summary: {
@@ -53,6 +81,12 @@ export async function GET(req: NextRequest) {
       totalCollected,
       byMethod,
       flagged,
+      unaccounted: {
+        count: unaccounted.count,
+        valueAtRiskNaira: unaccounted.valueAtRiskNaira,
+        items: unaccounted.items.map(describe),
+      },
+      integrityAnomalies: integrityAnomalies.map(describe),
     },
   });
 }

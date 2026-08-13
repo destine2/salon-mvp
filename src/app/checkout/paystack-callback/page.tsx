@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Status = "checking" | "success" | "error";
 
-export default function PaystackCallbackPage() {
+function CallbackStatus() {
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference") ?? searchParams.get("trxref");
 
@@ -31,7 +31,7 @@ export default function PaystackCallbackPage() {
   }, [reference]);
 
   return (
-    <main style={{ padding: "2.5rem", maxWidth: 420 }}>
+    <>
       {status === "checking" && <p>Confirming your payment...</p>}
       {status === "success" && (
         <>
@@ -45,6 +45,26 @@ export default function PaystackCallbackPage() {
           <p style={{ color: "crimson" }}>{message}</p>
         </>
       )}
+    </>
+  );
+}
+
+/**
+ * useSearchParams() opts a route into client-side rendering, and Next's App
+ * Router requires it to sit inside a Suspense boundary — without one, the
+ * production build fails to prerender this page and `next build` errors out,
+ * which blocks deployment entirely.
+ *
+ * That matters more here than on most pages: this is where Paystack returns
+ * the customer after payment, so a build that cannot ship it means card
+ * payments have nowhere to land.
+ */
+export default function PaystackCallbackPage() {
+  return (
+    <main style={{ padding: "2.5rem", maxWidth: 420 }}>
+      <Suspense fallback={<p>Confirming your payment...</p>}>
+        <CallbackStatus />
+      </Suspense>
       <p>
         <a href="/dashboard/calendar">Back to calendar</a>
       </p>
