@@ -29,6 +29,7 @@ model Salon {
   appointments   Appointment[]
   products       Product[]
   services       Service[]
+  businessHours  BusinessHours[]
 
   // Phase 3: multi-branch support hangs off this same Salon model via a
   // future parentSalonId self-relation — deliberately left out of MVP scope.
@@ -99,6 +100,26 @@ model Customer {
 // ---------------------------------------------------------------------------
 // Catalogue
 // ---------------------------------------------------------------------------
+
+/// Opening hours per weekday, in Lagos wall-clock minutes past midnight.
+///
+/// Minutes-as-integers rather than a `time` column: it sidesteps Prisma/Postgres
+/// time-with-timezone ambiguity entirely, and the slot maths works in minutes
+/// anyway (see src/lib/day-availability.ts).
+///
+/// A missing weekday row means CLOSED that day. A salon with no rows at all is
+/// treated as not-yet-configured and falls back to 09:00–19:00, so adding this
+/// table cannot silently close every existing salon.
+model BusinessHours {
+  id        String @id @default(cuid())
+  salonId   String
+  salon     Salon  @relation(fields: [salonId], references: [id], onDelete: Cascade)
+  weekday   Int // 0 = Sunday .. 6 = Saturday, matching Date.getUTCDay()
+  opensMin  Int
+  closesMin Int
+
+  @@unique([salonId, weekday])
+}
 
 model Service {
   id          String   @id @default(cuid())

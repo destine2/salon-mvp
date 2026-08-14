@@ -79,6 +79,9 @@ implemented. Pages (all under `/dashboard` unless noted):
 - **Staff** (`/dashboard/staff`) — add/remove, set and edit each person's
   commission rule (percent / flat / chair rental), set up their Paystack
   payout subaccount
+- **Opening hours** (`/dashboard/hours`) — per-weekday open/close times in
+  Lagos time; unchecking a day closes it. A salon that has never set hours
+  falls back to 9:00–19:00 rather than appearing closed forever.
 - **Calendar** (`/dashboard/calendar`) — day view grouped by staff, walk-in
   quick-add, confirm/no-show/cancel actions
 - **Customer booking** (`/book/[salonId]`, public, no login) — pick a
@@ -117,8 +120,9 @@ Known gaps worth knowing about before you rely on this:
   Paystack subaccount split automatically — the two can drift out of sync
 - Hard-deleting a staff member with existing bookings/payments will fail on
   purpose (no soft-delete/deactivate flow yet)
-- Business hours are hardcoded to 9am–7pm for every salon
-  (`src/lib/scheduling.ts` — `BUSINESS_HOURS`)
+- Opening hours are salon-wide, not per-staff — one stylist working a
+  different shift from the rest isn't modelled yet (PRD keeps per-staff
+  schedules out of MVP)
 
 ## What has actually been verified
 
@@ -145,7 +149,9 @@ deploy rather than trusting `npm run dev`.
 1. `npm install`, then `npx prisma migrate dev` — should complete with no errors.
 2. Log in via `/login` with the seeded phone number.
 3. Add a service and a staff member (with a commission rule) on their
-   respective pages.
+   respective pages, and set your opening hours on `/dashboard/hours`.
+   Then confirm the booking page only offers times inside those hours, and
+   offers nothing at all on a day you marked closed.
 4. Open `/book/[salonId]` in an incognito window (find `salonId` on the
    dashboard's booking-link line) and book an appointment as a "customer."
 5. Confirm the appointment appears on `/dashboard/calendar`, then try

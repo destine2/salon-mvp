@@ -1,25 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { ACTIVE_STATUSES, appointmentEndTime, conflictsWithAny } from "@/lib/overlap";
 
-// Fixed default hours for MVP — every salon is assumed open 9am-7pm local
-// time. Making this per-salon/configurable is a reasonable Phase 2+ add-on
-// once real pilot salons tell us their actual hours vary.
-export const BUSINESS_HOURS = { startHour: 9, endHour: 19 };
-const SLOT_STEP_MIN = 30;
-
-/** Every slot start time for a given day, regardless of availability. */
-export function generateDaySlotStarts(date: Date): Date[] {
-  const slots: Date[] = [];
-  const day = new Date(date);
-  day.setHours(BUSINESS_HOURS.startHour, 0, 0, 0);
-  const end = new Date(date);
-  end.setHours(BUSINESS_HOURS.endHour, 0, 0, 0);
-
-  for (let t = new Date(day); t < end; t = new Date(t.getTime() + SLOT_STEP_MIN * 60_000)) {
-    slots.push(new Date(t));
-  }
-  return slots;
-}
+// Slot generation lives in src/lib/day-availability.ts now. The version that
+// used to sit here hardcoded 9am-7pm for every salon and built times with
+// setHours(), i.e. the *server's* timezone — correct on a Lagos laptop, an
+// hour out on Vercel's UTC servers. Both are deliberately gone rather than
+// deprecated, so neither can be picked up again by accident.
 
 /**
  * True if staffId has no existing (non-cancelled/no-show) appointment that

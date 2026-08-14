@@ -30,13 +30,17 @@ export default async function DashboardPage() {
   // wizard (out of MVP scope: owners are pre-seeded, not self-registering),
   // this just checks what's missing and points at it. Booking can't work
   // with zero services or zero non-owner staff, so call that out plainly.
-  const [serviceCount, otherStaffCount] = await Promise.all([
+  const [serviceCount, otherStaffCount, hoursCount] = await Promise.all([
     prisma.service.count({ where: { salonId: staff.salonId } }),
     prisma.staff.count({ where: { salonId: staff.salonId, role: { not: "OWNER" } } }),
+    prisma.businessHours.count({ where: { salonId: staff.salonId } }),
   ]);
   const setupSteps = [
     { done: serviceCount > 0, label: "Add at least one service", href: "/dashboard/services" },
     { done: otherStaffCount > 0, label: "Add at least one staff member", href: "/dashboard/staff" },
+    // Not strictly blocking — unset hours fall back to 9-19 — but a salon
+    // running on someone else's default hours will take bookings it can't serve.
+    { done: hoursCount > 0, label: "Set your opening hours", href: "/dashboard/hours" },
   ];
   const setupIncomplete = setupSteps.some((s) => !s.done);
 
@@ -70,6 +74,9 @@ export default async function DashboardPage() {
         </li>
         <li>
           <Link href="/dashboard/staff">Manage staff & commission</Link>
+        </li>
+        <li>
+          <Link href="/dashboard/hours">Opening hours</Link>
         </li>
         <li>
           <Link href="/dashboard/reports">Daily reconciliation</Link>
