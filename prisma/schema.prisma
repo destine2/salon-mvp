@@ -160,12 +160,21 @@ model Appointment {
   serviceId  String
   service    Service  @relation(fields: [serviceId], references: [id])
 
-  startTime  DateTime
+  // @db.Timestamptz is required, not cosmetic: these are absolute instants
+  // (computed via lib/lagos-time.ts), and the exclusion constraint in
+  // prisma/sql/001_appointment_no_overlap.sql needs them as timestamptz to
+  // avoid an implicit timestamp->timestamptz cast. That cast is STABLE, not
+  // IMMUTABLE — it depends on the session's TimeZone setting — and Postgres
+  // rejects any non-immutable function anywhere in an index expression,
+  // including one inserted implicitly for a type mismatch. Discovered
+  // applying this constraint against a live database; Prisma's default
+  // DateTime mapping (bare `timestamp`, no tz) does not satisfy it.
+  startTime  DateTime @db.Timestamptz(3)
   // Denormalized from startTime + service.durationMin at write time. It exists
   // so the database can enforce non-overlap directly: an exclusion constraint
   // needs a range, and a range needs an end. Every write path must set it —
   // see appointmentEndTime() in src/lib/overlap.ts.
-  endTime    DateTime
+  endTime    DateTime @db.Timestamptz(3)
   status     AppointmentStatus @default(BOOKED)
   isWalkIn   Boolean  @default(false)
 

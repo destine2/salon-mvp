@@ -67,9 +67,46 @@ Nothing can be verified without this. It's also the quickest item on the list.
 2. Choose the region closest to Nigeria (usually **eu-west** / London).
 3. Copy the **connection string**.
 
-**One gotcha:** Supabase gives you two connection strings — a direct one (port
-5432) and a pooled one (port 6543). Use the **direct** one for now; pooling only
-matters once we deploy to Vercel, and I'll handle that then.
+**The gotcha that will actually bite you — do not use the "Direct connection"
+string.** Since 2024 Supabase serves direct connections over **IPv6 only**, and
+most home and office networks in Nigeria are IPv4. The symptom is not an error:
+the connection just *hangs* until it times out, which looks like a broken
+project rather than a network mismatch. (Confirmed on this project — the direct
+host has no IPv4 address at all.)
+
+Use the **Session pooler** string instead. In the Supabase dashboard press
+**Connect** (top bar), then under *Connection string* choose **Session pooler**.
+It looks like:
+
+```
+postgresql://postgres.<project-ref>:<password>@aws-N-<region>.pooler.supabase.com:5432/postgres
+```
+
+Copy it exactly as shown — don't guess at `aws-0` vs `aws-1` or the region.
+This project's turned out to be `aws-1-eu-west-1`, found only by getting it
+from the dashboard directly; brute-forcing region/prefix combinations against
+a live database is slow and not something to repeat.
+
+Note the username is `postgres.<project-ref>`, not plain `postgres`. Append
+`?sslmode=require` — without it, Prisma fails with `P1001: Can't reach
+database server`, which reads like a network problem but isn't one.
+
+**Later, for Vercel:** serverless functions open many short-lived connections
+and should use the **Transaction pooler** (port 6543) with `?pgbouncer=true`
+appended. We'll set that as a separate production variable at deploy time —
+transaction mode doesn't support prepared statements, so it can't be used for
+migrations.
+
+**If your password contains `@`, `#`, `/` or `:`** it must be percent-encoded in
+the URL (`@` becomes `%40`), otherwise the URL parser misreads where the
+password ends and the hostname begins.
+
+**`prisma migrate dev` will hang against this pooler — use `migrate deploy`
+instead.** `migrate dev` needs a shadow database to compute its diff, which
+needs `CREATE DATABASE` privileges the pooler doesn't grant; it hangs rather
+than failing cleanly. `migrate deploy` applies migration files directly and
+needs no shadow database — write the migration SQL by hand when a schema
+change is non-trivial, then `npx prisma migrate deploy`.
 
 ---
 
