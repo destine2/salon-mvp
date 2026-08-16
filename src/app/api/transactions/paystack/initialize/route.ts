@@ -35,13 +35,37 @@ export async function POST(req: NextRequest) {
   // fine at pilot scale, worth a proper unique-reference scheme before scale.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
-  const result = await initializeSplitTransaction({
-    email: `${appointment.customer.phone}@salon-mvp.local`,
-    amountKobo: Math.round(Number(appointment.service.priceNaira) * 100),
-    subaccountCode: appointment.staff.paystackSubaccountCode,
-    reference: appointment.id,
-    callbackUrl: `${appUrl}/checkout/paystack-callback`,
-  });
+  // Paystack rejects reserved/non-routable TLDs outright — verified live:
+  // "@...local" fails with "Invalid Email Address Passed" (400) on every
+  // single call, so every card/transfer checkout in the app was broken
+  // before this fix. ".local" is RFC 6762 mDNS space, not a real TLD;
+  // Paystack's validator (correctly) doesn't accept it. ".com" is not
+  // deliverable either, but it satisfies validation, which is all this
+  // placeholder needs to do — the customer is never actually emailed.
+  const placeholderEmail = `${appointment.customer.phone}@customer.salon-mvp.com`;
+
+  let result;
+  try {
+    result = await initializeSplitTransaction({
+      email: placeholderEmail,
+      amountKobo: Math.round(Number(appointment.service.priceNaira) * 100),
+      subaccountCode: appointment.staff.paystackSubaccountCode,
+      reference: appointment.id,
+      callbackUrl: `${appUrl}/checkout/paystack-callback`,
+    });
+  } catch (error) {
+    // axios throws on any 4xx/5xx by default, so an unhandled call here
+    // — confirmed live against the .local bug above — reaches this route as
+    // an unhandled rejection and Next.js turns it into a raw 500. The
+    // `if (!result?.status)` check below only ever fires for the (rarer)
+    // case where Paystack itself responds 200 with a soft failure body;
+    // this catch is what makes an actual HTTP-level rejection degrade to
+    // the same clean error response instead of crashing.
+    const message =
+      (error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+      (error instanceof Error ? error.message : "Paystack could not start this payment.");
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
+  }
 
   if (!result?.status) {
     return NextResponse.json({ ok: false, error: result?.message ?? "Paystack could not start this payment." }, { status: 502 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { submitOrQueue } from "@/lib/offline-sync";
 
@@ -22,6 +22,18 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Splits an ISO instant into the date/time pair a <input type="date"/time">
+ *  pair needs, in the browser's local time — which is what the person
+ *  rescheduling actually sees on their own clock. */
+function toLocalDateTimeParts(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
 export default function CalendarPage() {
   const [date, setDate] = useState(todayIso());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -36,6 +48,15 @@ export default function CalendarPage() {
   const [waCustomerName, setWaCustomerName] = useState("");
   const [waCustomerPhone, setWaCustomerPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Reschedule — inline per-row editor rather than a modal, since it's the
+  // fastest path for someone doing this mid-conversation with a customer.
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [rsDate, setRsDate] = useState("");
+  const [rsTime, setRsTime] = useState("");
+  const [rsStaffId, setRsStaffId] = useState("");
+  const [rsError, setRsError] = useState<string | null>(null);
+  const [rsSaving, setRsSaving] = useState(false);
 
   async function loadAll() {
     setLoading(true);
@@ -125,6 +146,55 @@ export default function CalendarPage() {
     }
   }
 
+  function startReschedule(a: Appointment) {
+    const parts = toLocalDateTimeParts(a.startTime);
+    setReschedulingId(a.id);
+    setRsDate(parts.date);
+    setRsTime(parts.time);
+    setRsStaffId(a.staff.id);
+    setRsError(null);
+  }
+
+  function cancelReschedule() {
+    setReschedulingId(null);
+    setRsError(null);
+  }
+
+  async function saveReschedule(id: string) {
+    if (!rsDate || !rsTime) {
+      setRsError("Pick both a date and a time.");
+      return;
+    }
+    setRsSaving(true);
+    setRsError(null);
+    try {
+      // `new Date("YYYY-MM-DDTHH:MM")` parses as browser-local time, which is
+      // what the two plain inputs represent — then .toISOString() carries
+      // that instant to the API in UTC. No timezone maths needed here: the
+      // browser already knows the offset for "right now, this device."
+      const startTime = new Date(`${rsDate}T${rsTime}`).toISOString();
+      const res = await fetch(`/api/appointments/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startTime, staffId: rsStaffId }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        // The exclusion constraint is what actually enforces this — this
+        // message is Postgres's rejection surfaced as the same 409 wording
+        // used everywhere else in the app, not a separate error path.
+        setRsError(data.error ?? "That slot isn't available.");
+        return;
+      }
+      setReschedulingId(null);
+      await loadAll();
+    } catch (err) {
+      setRsError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setRsSaving(false);
+    }
+  }
+
   const byStaff = new Map<string, Appointment[]>();
   for (const appt of appointments) {
     const list = byStaff.get(appt.staff.id) ?? [];
@@ -162,27 +232,63 @@ export default function CalendarPage() {
               </thead>
               <tbody>
                 {appts.map((a) => (
-                  <tr key={a.id} style={{ borderBottom: "1px solid #eee" }}>
-                    <td>{new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
-                    <td>
-                      {a.customer.name || "—"} ({a.customer.phone}){a.isWalkIn ? " · walk-in" : ""}
-                    </td>
-                    <td>{a.service.name}</td>
-                    <td>{a.status}</td>
-                    <td style={{ display: "flex", gap: 6 }}>
-                      {(a.status === "BOOKED" || a.status === "CONFIRMED") && (
-                        <>
-                          {a.status === "BOOKED" && (
-                            <button onClick={() => updateStatus(a.id, "CONFIRMED")}>Confirm</button>
-                          )}
-                          <Link href={`/dashboard/checkout/${a.id}`}>Checkout</Link>
-                          <button onClick={() => updateStatus(a.id, "NO_SHOW")}>No-show</button>
-                          <button onClick={() => updateStatus(a.id, "CANCELLED")}>Cancel</button>
-                        </>
-                      )}
-                      {a.status === "COMPLETED" && a.transaction && <span>Paid ✓</span>}
-                    </td>
-                  </tr>
+                  <Fragment key={a.id}>
+                    <tr style={{ borderBottom: reschedulingId === a.id ? "none" : "1px solid #eee" }}>
+                      <td>{new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
+                      <td>
+                        {a.customer.name || "—"} ({a.customer.phone}){a.isWalkIn ? " · walk-in" : ""}
+                      </td>
+                      <td>{a.service.name}</td>
+                      <td>{a.status}</td>
+                      <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {(a.status === "BOOKED" || a.status === "CONFIRMED") && (
+                          <>
+                            {a.status === "BOOKED" && (
+                              <button onClick={() => updateStatus(a.id, "CONFIRMED")}>Confirm</button>
+                            )}
+                            <Link href={`/dashboard/checkout/${a.id}`}>Checkout</Link>
+                            <button onClick={() => startReschedule(a)}>Reschedule</button>
+                            <button onClick={() => updateStatus(a.id, "NO_SHOW")}>No-show</button>
+                            <button onClick={() => updateStatus(a.id, "CANCELLED")}>Cancel</button>
+                          </>
+                        )}
+                        {a.status === "COMPLETED" && a.transaction && <span>Paid ✓</span>}
+                      </td>
+                    </tr>
+                    {reschedulingId === a.id && (
+                      <tr style={{ borderBottom: "1px solid #eee", background: "#f7f7f5" }}>
+                        <td colSpan={5} style={{ padding: "10px 4px" }}>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <label>
+                              Date{" "}
+                              <input type="date" value={rsDate} onChange={(e) => setRsDate(e.target.value)} style={{ padding: 6 }} />
+                            </label>
+                            <label>
+                              Time{" "}
+                              <input type="time" value={rsTime} onChange={(e) => setRsTime(e.target.value)} style={{ padding: 6 }} />
+                            </label>
+                            <label>
+                              Stylist{" "}
+                              <select value={rsStaffId} onChange={(e) => setRsStaffId(e.target.value)} style={{ padding: 6 }}>
+                                {staffOptions.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <button onClick={() => saveReschedule(a.id)} disabled={rsSaving}>
+                              {rsSaving ? "Saving..." : "Save"}
+                            </button>
+                            <button onClick={cancelReschedule} disabled={rsSaving} type="button">
+                              Cancel
+                            </button>
+                          </div>
+                          {rsError && <p style={{ color: "crimson", margin: "6px 0 0" }}>{rsError}</p>}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

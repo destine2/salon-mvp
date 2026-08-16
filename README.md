@@ -83,7 +83,10 @@ implemented. Pages (all under `/dashboard` unless noted):
   Lagos time; unchecking a day closes it. A salon that has never set hours
   falls back to 9:00–19:00 rather than appearing closed forever.
 - **Calendar** (`/dashboard/calendar`) — day view grouped by staff, walk-in
-  quick-add, confirm/no-show/cancel actions
+  quick-add, confirm/no-show/cancel actions, and an inline reschedule editor
+  (date/time/stylist) — protected by the same exclusion constraint as every
+  other write path, so a reschedule into an occupied slot gets the same 409
+  rather than silently double-booking it
 - **Customer booking** (`/book/[salonId]`, public, no login) — pick a
   service/stylist/time from real availability, confirm with just a phone
   number; this is the page the WhatsApp booking link opens
@@ -114,8 +117,6 @@ Known gaps worth knowing about before you rely on this:
 - Service worker registration is **production-only** (`register-sw.tsx`), so
   offline behaviour won't appear under `npm run dev`. Test it with
   `npm run build && npm start`, then use DevTools → Network → Offline.
-- No reschedule UI on the calendar (the API supports it — `PATCH
-  /api/appointments/[id]` with a new `startTime`/`staffId` — just no button yet)
 - Editing a staff member's commission rule doesn't update their existing
   Paystack subaccount split automatically — the two can drift out of sync
 - Hard-deleting a staff member with existing bookings/payments will fail on
@@ -165,7 +166,12 @@ deploy rather than trusting `npm run dev`.
 7. Check out one appointment with Cash for less than the service price —
    confirm it shows up flagged on `/dashboard/reports`.
 8. Check out another appointment with Paystack (test-mode card) — confirm
-   the redirect, the callback page, and that it lands as `COMPLETED`.
+   the redirect, the callback page, and that it lands as `COMPLETED`. This
+   exact call was broken until it was tested live: the placeholder customer
+   email used a `.local` domain, which Paystack's API rejects outright
+   ("Invalid Email Address Passed"), and there was no error handling around
+   the call, so the failure surfaced as a raw 500 rather than a usable
+   message. Both are fixed — this step is what would have caught it earlier.
 9. Log in as the staff member added in step 3 and confirm `/dashboard/earnings`
    shows their share from step 8.
 10. Turn off wifi, add a walk-in and do a cash checkout, turn wifi back on,

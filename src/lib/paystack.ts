@@ -38,7 +38,15 @@ export async function createStaffSubaccount(params: {
  * main account and the staff member's subaccount at the agreed commission rate.
  */
 export async function initializeSplitTransaction(params: {
-  email: string; // Paystack requires a customer email even for a phone-first flow — use a placeholder like {phone}@salon-mvp.local
+  // Paystack requires a customer email even for a phone-first flow. Use a
+  // placeholder built from the phone number, but NOT a `.local` domain —
+  // confirmed live against Paystack's API: it's rejected outright with
+  // "Invalid Email Address Passed" (400), because .local is RFC 6762 mDNS
+  // space, not a real TLD. Any real TLD works even though nothing is
+  // actually deliverable to it; see the placeholder in
+  // src/app/api/transactions/paystack/initialize/route.ts for the pattern
+  // in use.
+  email: string;
   amountKobo: number; // Paystack amounts are in kobo (amount * 100)
   subaccountCode: string;
   transactionChargePercent?: number; // overrides the subaccount's default split for this one transaction
