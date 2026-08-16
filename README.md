@@ -5,10 +5,12 @@ checkout, and automatic staff commission splitting. Stack and rationale are in
 the companion PRD, section 8.1; this repo is the Week 0-2 scaffold from
 section 8.2 of that document.
 
-**Where the PRD actually is:** `Salon_SaaS_PRD.docx`, alongside the business
-plan and discovery interview script, in the parent folder rather than this
-repo — so it is not version-controlled with the code and does not travel
-with a clone. Worth moving in if this repo is ever shared with anyone else.
+**Where the PRD actually is:** [`docs/product/`](docs/product/) —
+`Salon_SaaS_PRD.docx`, the business plan, the discovery interview script,
+and the one-pager. Copied in from outside the repo on 2026-08-16 so they're
+version-controlled and travel with a clone; see that folder's own README for
+what each document is and the caveat that they're copies, not the canonical
+source.
 
 **How this system fits together, not just how to run it:** see
 [`ARCHITECTURE.md`](ARCHITECTURE.md) — the data model, why the double-booking
