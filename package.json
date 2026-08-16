@@ -12,6 +12,7 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "prisma db seed",
     "test": "node --import tsx --test src/**/*.test.ts",
+    "test:concurrency": "RUN_CONCURRENCY_TEST=1 node --import tsx --test src/lib/overlap.concurrency.test.ts",
     "db:constraints": "psql \"$DATABASE_URL\" -f prisma/sql/001_appointment_no_overlap.sql"
   },
   "prisma": {

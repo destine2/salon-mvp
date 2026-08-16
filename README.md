@@ -5,6 +5,16 @@ checkout, and automatic staff commission splitting. Stack and rationale are in
 the companion PRD, section 8.1; this repo is the Week 0-2 scaffold from
 section 8.2 of that document.
 
+**Where the PRD actually is:** `Salon_SaaS_PRD.docx`, alongside the business
+plan and discovery interview script, in the parent folder rather than this
+repo — so it is not version-controlled with the code and does not travel
+with a clone. Worth moving in if this repo is ever shared with anyone else.
+
+**How this system fits together, not just how to run it:** see
+[`ARCHITECTURE.md`](ARCHITECTURE.md) — the data model, why the double-booking
+constraint has to live in the database, the timestamp bug that only appeared
+in production, and the Paystack bug only real API calls could have caught.
+
 ## Stack
 
 - Next.js (App Router) + TypeScript — frontend + API in one codebase
@@ -127,23 +137,42 @@ Known gaps worth knowing about before you rely on this:
 
 ## What has actually been verified
 
-Verified locally, so these are facts rather than intentions:
+Verified against real infrastructure, not just typechecked — these are facts,
+not intentions:
 
-- `npx tsc --noEmit` — clean
-- `npm run build` — succeeds, all 26 routes generate
-- `npm test` — 20 tests passing (overlap rules, reconciliation logic)
+- `npx tsc --noEmit` and `npm run build` — clean, all 28 routes generate
+- `npm test` — 33 unit tests passing (overlap rules, reconciliation logic,
+  availability computation, Lagos time handling)
+- **Database:** migrations applied, exclusion constraint applied and
+  confirmed present in `pg_constraint`, against the live Supabase project.
+- **The double-booking claim, proven, not asserted:** `npm run
+  test:concurrency` fires 8 simultaneous `appointment.create()` calls at the
+  identical staff+slot, no pre-check, straight through Prisma. Exactly 1
+  succeeds, 7 are rejected by Postgres itself (SQLSTATE `23P01`, naming
+  `appointment_no_overlap`), exactly 1 row lands in the table. See
+  `src/lib/overlap.concurrency.test.ts` and `ARCHITECTURE.md`.
+- **Paystack:** the secret key is valid (confirmed against
+  `/transaction/totals`). `createStaffSubaccount` and
+  `initializeSplitTransaction` both work against Paystack's real test
+  environment — a real subaccount was created, bank-verified, and a real
+  split transaction was initialized and verified against it. This is also
+  what caught a live bug: the placeholder customer email used a `.local`
+  domain, which Paystack's validator rejects outright ("Invalid Email
+  Address Passed") — every Paystack checkout in the app would have failed
+  on this before it was found and fixed.
 
-**Not yet verified, because it needs a live database and real accounts:**
-every query path, Paystack test-mode payment, Termii OTP/SMS delivery, the
-offline sync round trip, and the reminder cron. The QA checklist below is
-still the real second checkpoint — nothing here has ever talked to Postgres.
+**Not yet verified:** Termii OTP/SMS delivery (blocked on sender-ID
+approval — see `SETUP-CHECKLIST.md`), the offline sync round trip against a
+real dropped connection, and the reminder cron. The QA checklist below
+covers all three manually.
 
-The one thing the build already caught: `/checkout/paystack-callback` used
-`useSearchParams()` without a Suspense boundary, which failed prerendering
-and made `next build` exit non-zero. That would have blocked the Vercel
-deploy outright, on the page Paystack returns customers to after payment.
-Fixed — but it is a good argument for running `npm run build` before every
-deploy rather than trusting `npm run dev`.
+Two things worth knowing about *how* the database and Paystack items above
+got verified, both recorded in `ARCHITECTURE.md`: a Postgres volatility
+subtlety that broke the exclusion constraint twice in two different ways
+before it applied cleanly, and a `next build` failure
+(`/checkout/paystack-callback` needed a Suspense boundary) that would have
+silently blocked the Vercel deploy — caught only because the build was
+actually run, not just `tsc`.
 
 ## QA checklist (run this before showing it to a real salon)
 
