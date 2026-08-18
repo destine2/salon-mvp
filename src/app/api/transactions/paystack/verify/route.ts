@@ -39,6 +39,21 @@ export async function GET(req: NextRequest) {
   // Paystack already moved the money via the subaccount split at checkout
   // time — these split rows are for reporting/reconciliation, not a second
   // payout, hence settledViaPaystack: true.
+  //
+  // This recomputes the split from CommissionRule as it exists right now,
+  // same as /paystack/initialize did when it told Paystack how much to
+  // route to the owner. In the ordinary case (checkout completes within the
+  // few minutes a customer takes to pay) they agree, because it's the same
+  // function on the same inputs. The one gap: if the owner edits this
+  // staff member's commission rule in the window between initialize and
+  // verify, this recomputes with the NEW rule while Paystack already paid
+  // out using the split baked in at initialize time — the two would
+  // disagree, silently, for that one transaction. Closing that fully means
+  // stashing the split actually sent (e.g. in Paystack's metadata field on
+  // initialize, read back here) rather than recomputing; not done here
+  // because it's a narrow window on an action (editing commission rules)
+  // that doesn't happen mid-checkout in practice, and this is worth
+  // revisiting if that assumption ever stops holding.
   const split = rule ? calculateSplit(rule, amount) : { ownerShare: amount, staffShare: 0 };
 
   const transaction = await prisma.$transaction(async (tx) => {

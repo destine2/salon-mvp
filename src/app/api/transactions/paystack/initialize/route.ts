@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { initializeSplitTransaction } from "@/lib/paystack";
+import { calculateSplit } from "@/lib/commission";
 
 export async function POST(req: NextRequest) {
   const session = getSession();
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointmentId },
-    include: { service: true, staff: true, customer: true, transaction: true },
+    include: { service: true, staff: { include: { commissionRule: true } }, customer: true, transaction: true },
   });
   if (!appointment || appointment.salonId !== session.salonId) {
     return NextResponse.json({ ok: false, error: "Appointment not found" }, { status: 404 });
@@ -44,12 +45,26 @@ export async function POST(req: NextRequest) {
   // placeholder needs to do — the customer is never actually emailed.
   const placeholderEmail = `${appointment.customer.phone}@customer.salon-mvp.com`;
 
+  // The one place that decides who is owed what is calculateSplit() — used
+  // here to decide what Paystack actually pays out, and again at verify time
+  // to decide what gets recorded for reporting. Using it in both places with
+  // the same inputs (the fixed service price, the commission rule) is what
+  // keeps "what was actually paid" and "what the dashboard shows" from
+  // disagreeing — they were previously computed by two different mechanisms
+  // (Paystack's stored subaccount percentage vs. this function), which could
+  // silently diverge for any commission type other than PERCENT, or for any
+  // PERCENT rule edited after the subaccount was first set up.
+  const servicePriceNaira = Number(appointment.service.priceNaira);
+  const rule = appointment.staff.commissionRule;
+  const split = rule ? calculateSplit(rule, servicePriceNaira) : { ownerShare: servicePriceNaira, staffShare: 0 };
+
   let result;
   try {
     result = await initializeSplitTransaction({
       email: placeholderEmail,
-      amountKobo: Math.round(Number(appointment.service.priceNaira) * 100),
+      amountKobo: Math.round(servicePriceNaira * 100),
       subaccountCode: appointment.staff.paystackSubaccountCode,
+      ownerShareKobo: Math.round(split.ownerShare * 100),
       reference: appointment.id,
       callbackUrl: `${appUrl}/checkout/paystack-callback`,
     });

@@ -188,9 +188,23 @@ the comment block at the top of `public/sw.js`.
   worth revisiting if concurrent booking volume grows.
 - **WhatsApp.** SMS-only today, gated on Meta Business verification — see
   `SETUP-CHECKLIST.md`.
-- **Commission-rule / Paystack-subaccount drift.** Editing a staff member's
-  commission rule in the app doesn't push the change to their existing
-  Paystack subaccount split — the two can disagree until someone notices.
+- ~~Commission-rule / Paystack-subaccount drift~~ **Fixed.** Paystack
+  subaccounts are created with a `percentage_charge`, but `calculateSplit()`
+  (`src/lib/commission.ts`) also supports FLAT and CHAIR_RENTAL rules — a
+  fixed naira amount, not a percentage — which no single static
+  `percentage_charge` can represent correctly across different service
+  prices (a ₦5,000 FLAT cut is 83% of a ₦6,000 service and 28% of an
+  ₦18,000 one). `POST /api/transactions/paystack/initialize` now computes
+  the split with `calculateSplit()` on every checkout and passes it as
+  Paystack's per-transaction `transaction_charge` override (a flat kobo
+  amount — confirmed against Paystack's docs, not assumed), so what
+  Paystack actually pays out always matches what the rule says, for all
+  three commission types. The subaccount's stored `percentage_charge` is
+  now just a fallback/dashboard-display value. Covered by
+  `src/lib/commission.test.ts`. One narrow gap remains: if a commission
+  rule is edited in the few minutes between checkout `initialize` and
+  `verify`, the two calls recompute the split with different rule values —
+  see the comment in `src/app/api/transactions/paystack/verify/route.ts`.
 - **No architecture-level test for the reminder cron, offline sync, or
   Termii integration** — these are described in README's QA checklist as
   manual steps, not automated.

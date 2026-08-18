@@ -20,12 +20,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     );
   }
 
-  // The subaccount's percentage_charge is what Paystack keeps for the MAIN
-  // (owner) account on every split payment to this staff member. We seed it
-  // from their current commission rule so Paystack and our own records
-  // agree at setup time — but the two aren't kept in sync automatically
-  // after this. If the commission rule changes later, the subaccount's
-  // split needs to be updated too (a known MVP gap, worth a follow-up task).
+  // This seeds the subaccount's stored percentage_charge, but it's a
+  // fallback only — every real checkout overrides it per-transaction (see
+  // initializeSplitTransaction's ownerShareKobo, computed fresh from
+  // calculateSplit() at checkout time), so this value drifting from the
+  // current commission rule later doesn't cause an incorrect payout. It's
+  // seeded reasonably here mainly so the Paystack dashboard itself shows a
+  // sane number if anyone looks at the subaccount directly.
   const rule = staff.commissionRule;
   const ownerPercentage = rule && rule.type === "PERCENT" ? 100 - Number(rule.value) : 50;
 
