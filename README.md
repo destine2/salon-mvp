@@ -88,12 +88,14 @@ in production, and the Paystack bug only real API calls could have caught.
 Every feature in the PRD's MVP scope (sections 5.1–5.5) has a first pass
 implemented. Pages (all under `/dashboard` unless noted):
 
-- **Auth** — phone + password login (`/login`), signed-cookie sessions
-  (`src/lib/session.ts`, `src/lib/auth.ts`), owner-only write guard
-  (`src/lib/require-owner.ts`). Not OTP-SMS: Termii is a paid API and its
-  sender ID is still pending approval, which made SMS the one thing
-  standing between an owner and their own dashboard — passwords are hashed
-  with `node:crypto` scrypt (`src/lib/password.ts`), no external dependency
+- **Auth** — self-serve signup (`/signup`) creates a new Salon + owner Staff
+  row and logs them straight in; phone + password login (`/login`) after
+  that, signed-cookie sessions (`src/lib/session.ts`, `src/lib/auth.ts`),
+  owner-only write guard (`src/lib/require-owner.ts`). Not OTP-SMS: Termii
+  is a paid API and its sender ID is still pending approval, which made SMS
+  the one thing standing between an owner and their own dashboard —
+  passwords are hashed with `node:crypto` scrypt (`src/lib/password.ts`),
+  no external dependency
 - **Services** (`/dashboard/services`) — add/remove, price + duration
 - **Staff** (`/dashboard/staff`) — add/remove, set and edit each person's
   commission rule (percent / flat / chair rental), set up their Paystack
@@ -193,8 +195,11 @@ actually run, not just `tsc`.
 ## QA checklist (run this before showing it to a real salon)
 
 1. `npm install`, then `npx prisma migrate dev` — should complete with no errors.
-2. Log in via `/login` with the seeded phone number and password (both
-   printed by `npm run prisma:seed`).
+2. Create a salon via `/signup` and confirm it logs you straight into
+   `/dashboard`. Separately, log in via `/login` with the seeded phone
+   number and password (both printed by `npm run prisma:seed`) to confirm
+   the two salons stay isolated from each other (see the tenant-isolation
+   note below).
 3. Add a service and a staff member (with a commission rule) on their
    respective pages, and set your opening hours on `/dashboard/hours`.
    Then confirm the booking page only offers times inside those hours, and
@@ -248,15 +253,21 @@ actually run, not just `tsc`.
 
 ## Onboarding your first pilot salon
 
-This is the one item on the task list that's genuinely yours, not code —
-it's the outcome of the discovery interviews (see the companion interview
-script) plus a working, deployed app. When you're ready: create their Salon
-+ owner Staff row (via `prisma studio` for now — there's no self-serve salon
-signup in MVP scope), walk them through services/staff/payouts once
-together, then hand them the booking link.
+The remaining part of this is genuinely yours, not code — it's the outcome
+of the discovery interviews (see the companion interview script) plus a
+working, deployed app. When you're ready: point them at `/signup` (or walk
+them through it yourself the first time), then help them through
+services/staff/payouts once together, and hand them the booking link.
 
 ## Data model notes
 
+- **Tenant isolation is enforced in application code, not Postgres RLS.**
+  Every route that touches a specific record checks `record.salonId ===
+  session.salonId` (or filters `where: { salonId: session.salonId }`)
+  before returning or writing anything — there's no database-level backstop
+  if a route forgets that check. Worth knowing now that `/signup` means
+  real, unrelated salons share the same tables for real, not just in a
+  seeded local dev DB.
 - `TransactionSplit` has one row per party paid out of a `Transaction`
   (owner + staff), so digital payments (settled via Paystack subaccounts)
   and cash payments (settled via an internal ledger entry) share the same

@@ -5,10 +5,13 @@ export default function Home() {
     <main style={{ padding: "2.5rem", maxWidth: 640 }}>
       <h1>Salon MVP — scaffold running</h1>
       <p>
-        Phone-OTP login is wired up: <Link href="/login">go to /login</Link>.
-        Run <code>npm run prisma:seed</code> first so there's a staff record
-        to log in as (edit the phone number in <code>prisma/seed.ts</code> to
-        your own, so the OTP actually reaches you).
+        New salon? <Link href="/signup">Set up your salon</Link>. Already
+        have an account? <Link href="/login">Log in</Link>.
+      </p>
+      <p>
+        For local testing, <code>npm run prisma:seed</code> creates a test
+        salon and prints an owner phone/password you can log in with
+        immediately.
       </p>
       <p>
         Check <code>/api/health</code> once <code>DATABASE_URL</code> is set
