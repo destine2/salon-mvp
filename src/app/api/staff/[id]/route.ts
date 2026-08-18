@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireOwnerSession } from "@/lib/require-owner";
+import { hashPassword } from "@/lib/password";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const { session, error } = requireOwnerSession();
@@ -16,6 +17,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.active === false && staff.role === "OWNER") {
     return NextResponse.json({ ok: false, error: "Can't deactivate the owner account" }, { status: 400 });
   }
+  if (body.password != null && body.password.length < 8) {
+    return NextResponse.json({ ok: false, error: "Password must be at least 8 characters." }, { status: 400 });
+  }
 
   await prisma.staff.update({
     where: { id: params.id },
@@ -23,6 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       name: body.name ?? staff.name,
       role: body.role ?? staff.role,
       active: body.active ?? staff.active,
+      passwordHash: body.password ? hashPassword(body.password) : undefined,
     },
   });
 

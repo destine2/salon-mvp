@@ -10,7 +10,7 @@ Ordered so the slowest queues start first and the biggest blocker clears soonest
 | # | Task | Time | Unblocks |
 |---|---|---|---|
 | 1 | Start Meta Business verification | 15 min, then days–weeks waiting | WhatsApp (Phase D) |
-| 2 | Termii account + sender ID | 20 min, then 1–3 days waiting | OTP login, SMS reminders |
+| 2 | Termii account + sender ID | 20 min, then 1–3 days waiting | SMS reminders (no longer blocks login — see below) |
 | 3 | Postgres database | 10 min | **Everything — my main blocker** |
 | 4 | Paystack test keys | 15 min | Checkout, splits, commissions |
 | 5 | Fill in `.env` | 5 min | Me, immediately |
@@ -43,7 +43,12 @@ If you start it today, it will likely clear around the time the rest is ready.
 
 ## 2. Termii account + sender ID
 
-Termii is your BSP for both phone-OTP login and SMS reminders.
+Termii is your BSP for SMS/WhatsApp appointment reminders. Login no longer
+depends on it — Termii is a paid API and its sender ID takes days to
+approve, which made it a bad fit for something as basic as "can an owner
+get into their own dashboard." Login is phone + password now (see
+`README.md`'s Auth section), so this item only gates reminders and can move
+down your priority list.
 
 1. Sign up at [termii.com](https://termii.com).
 2. Copy your **API key** from the dashboard.
@@ -52,8 +57,8 @@ Termii is your BSP for both phone-OTP login and SMS reminders.
 4. Fund the account with a small amount (a few thousand naira is plenty for
    testing).
 
-**Sender ID approval takes 1–3 business days.** Until it clears, OTP login and
-reminders won't deliver — so request it now even though we don't need it today.
+**Sender ID approval takes 1–3 business days.** Until it clears, reminders
+won't deliver — everything else works without it.
 
 ---
 

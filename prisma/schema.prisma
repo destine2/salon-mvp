@@ -4,7 +4,13 @@
 // Provider: PostgreSQL (Supabase or Neon recommended for MVP — see README).
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Lets src/lib/prisma.ts globally exclude Staff.passwordHash from every
+  // query result in one place, instead of remembering a `select` at every
+  // call site that touches Staff (appointments, reports, the staff list...).
+  // Still "preview" in this Prisma version (5.22) despite being safe/stable
+  // in practice — no schema/runtime behavior changes, just client typing.
+  previewFeatures = ["omitApi"]
 }
 
 datasource db {
@@ -51,7 +57,8 @@ model Staff {
   salonId       String
   salon         Salon      @relation(fields: [salonId], references: [id])
   name          String
-  phone         String     @unique // used for OTP login
+  phone         String     @unique // login identifier
+  passwordHash  String?    // "salt:hash" via src/lib/password.ts — nullable only because it predates this column; every staff created going forward always has one
   role          StaffRole  @default(STYLIST)
   active        Boolean    @default(true) // deactivated staff keep their history but drop out of booking, dropdowns, and login — see src/app/api/staff/[id]/route.ts
   paystackSubaccountCode String? // set once the staff member's Paystack subaccount is created

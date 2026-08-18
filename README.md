@@ -22,7 +22,7 @@ in production, and the Paystack bug only real API calls could have caught.
 - Next.js (App Router) + TypeScript — frontend + API in one codebase
 - Prisma + PostgreSQL (Supabase or Neon recommended to start)
 - Paystack (Transaction Splits / subaccounts) for payment + commission
-- Termii for phone-OTP login and WhatsApp/SMS reminders
+- Termii for WhatsApp/SMS reminders (not login — see Auth below)
 
 ## Setup (Week 0)
 
@@ -43,9 +43,12 @@ in production, and the Paystack bug only real API calls could have caught.
    - `DATABASE_URL` — from step 2
    - `PAYSTACK_SECRET_KEY` / `PAYSTACK_PUBLIC_KEY` — sandbox keys from the
      [Paystack dashboard](https://dashboard.paystack.com/#/settings/developers)
-   - `TERMII_API_KEY` / `TERMII_SENDER_ID` — from [termii.com](https://termii.com)
-     (also start Meta Business verification for WhatsApp now — it's usually
-     the slowest step, see PRD section 8.2 note)
+   - `TERMII_API_KEY` / `TERMII_SENDER_ID` — from [termii.com](https://termii.com).
+     Only used for appointment reminders now, not login (see Auth below), so
+     you can skip this for local dev and come back to it later — it's a paid
+     API and the sender ID takes days to approve regardless (also start Meta
+     Business verification for WhatsApp now — it's usually the slowest step,
+     see PRD section 8.2 note)
 
 4. **Push the schema and generate the client**
    ```bash
@@ -64,18 +67,19 @@ in production, and the Paystack bug only real API calls could have caught.
    production before the first real booking. Without it the app still
    *appears* to work: the conflict just happens silently.
 
-6. **Seed a test salon + owner** — edit the phone number in `prisma/seed.ts`
-   to your own first, so the OTP actually reaches a phone you can read:
+6. **Seed a test salon + owner**
    ```bash
    npm run prisma:seed
    ```
+   Prints the seeded owner's phone and password — change both in
+   `prisma/seed.ts` before using this beyond local dev.
 
 7. **Run it**
    ```bash
    npm run dev
    ```
-   Visit `http://localhost:3000/login`, log in with the phone number from
-   the seed script, and you should land on `/dashboard`. Also check
+   Visit `http://localhost:3000/login`, log in with the phone/password the
+   seed script printed, and you should land on `/dashboard`. Also check
    `http://localhost:3000/api/health` to confirm Prisma can reach the
    database.
 
@@ -84,9 +88,12 @@ in production, and the Paystack bug only real API calls could have caught.
 Every feature in the PRD's MVP scope (sections 5.1–5.5) has a first pass
 implemented. Pages (all under `/dashboard` unless noted):
 
-- **Auth** — phone-OTP login (`/login`), signed-cookie sessions
+- **Auth** — phone + password login (`/login`), signed-cookie sessions
   (`src/lib/session.ts`, `src/lib/auth.ts`), owner-only write guard
-  (`src/lib/require-owner.ts`)
+  (`src/lib/require-owner.ts`). Not OTP-SMS: Termii is a paid API and its
+  sender ID is still pending approval, which made SMS the one thing
+  standing between an owner and their own dashboard — passwords are hashed
+  with `node:crypto` scrypt (`src/lib/password.ts`), no external dependency
 - **Services** (`/dashboard/services`) — add/remove, price + duration
 - **Staff** (`/dashboard/staff`) — add/remove, set and edit each person's
   commission rule (percent / flat / chair rental), set up their Paystack
@@ -169,10 +176,11 @@ not intentions:
   Address Passed") — every Paystack checkout in the app would have failed
   on this before it was found and fixed.
 
-**Not yet verified:** Termii OTP/SMS delivery (blocked on sender-ID
-approval — see `SETUP-CHECKLIST.md`), the offline sync round trip against a
-real dropped connection, and the reminder cron. The QA checklist below
-covers all three manually.
+**Not yet verified:** Termii SMS delivery for reminders (blocked on
+sender-ID approval — see `SETUP-CHECKLIST.md`; no longer on the login path,
+see Auth above), the offline sync round trip against a real dropped
+connection, and the reminder cron. The QA checklist below covers all three
+manually.
 
 Two things worth knowing about *how* the database and Paystack items above
 got verified, both recorded in `ARCHITECTURE.md`: a Postgres volatility
@@ -185,7 +193,8 @@ actually run, not just `tsc`.
 ## QA checklist (run this before showing it to a real salon)
 
 1. `npm install`, then `npx prisma migrate dev` — should complete with no errors.
-2. Log in via `/login` with the seeded phone number.
+2. Log in via `/login` with the seeded phone number and password (both
+   printed by `npm run prisma:seed`).
 3. Add a service and a staff member (with a commission rule) on their
    respective pages, and set your opening hours on `/dashboard/hours`.
    Then confirm the booking page only offers times inside those hours, and

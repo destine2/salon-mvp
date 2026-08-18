@@ -1,4 +1,5 @@
 import { PrismaClient, StaffRole, CommissionType } from "@prisma/client";
+import { hashPassword } from "../src/lib/password";
 
 const prisma = new PrismaClient();
 
@@ -13,17 +14,20 @@ async function main() {
     },
   });
 
-  // Replace this phone number with your own before running the seed, so the
-  // OTP actually lands somewhere you can read it during local testing.
   const ownerPhone = "2348000000000";
+  // Change this before seeding anything beyond local dev — re-running the
+  // seed resets it, which is convenient for testing and exactly why it
+  // shouldn't still be the default anywhere real.
+  const ownerPassword = "changeme123";
 
   const owner = await prisma.staff.upsert({
     where: { phone: ownerPhone },
-    update: {},
+    update: { passwordHash: hashPassword(ownerPassword) },
     create: {
       salonId: salon.id,
       name: "Owner",
       phone: ownerPhone,
+      passwordHash: hashPassword(ownerPassword),
       role: StaffRole.OWNER,
     },
   });
@@ -38,7 +42,7 @@ async function main() {
     },
   });
 
-  console.log("Seeded:", { salon: salon.name, owner: owner.phone });
+  console.log("Seeded:", { salon: salon.name, owner: owner.phone, password: ownerPassword });
 }
 
 main()

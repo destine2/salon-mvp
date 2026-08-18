@@ -1,0 +1,13 @@
+-- Hand-written rather than `prisma migrate dev` — see the header of
+-- 20260816095500_appointment_times_timestamptz/migration.sql for why
+-- (no shadow-database access against the Supabase pooler). Applied via
+-- `migrate deploy`.
+--
+-- Replaces OTP-SMS login (Termii) with password login: Termii is a paid
+-- API and its SMS sender ID is still pending approval, which made OTP the
+-- one thing standing between an owner and their own dashboard. Nullable
+-- because it predates this column — nothing existing had a password to
+-- migrate — but every staff member created from here on always gets one
+-- (see POST /api/staff), so in practice it's never actually null going
+-- forward.
+ALTER TABLE "Staff" ADD COLUMN "passwordHash" TEXT;

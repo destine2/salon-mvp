@@ -46,6 +46,7 @@ export default function StaffPage() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<StaffMember["role"]>("STYLIST");
   const [commissionType, setCommissionType] = useState<CommissionRule["type"]>("PERCENT");
   const [commissionValue, setCommissionValue] = useState("40");
@@ -61,6 +62,10 @@ export default function StaffPage() {
   const [editType, setEditType] = useState<CommissionRule["type"]>("PERCENT");
   const [editValue, setEditValue] = useState("");
   const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const [resetPasswordFor, setResetPasswordFor] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   async function loadStaff() {
     setLoading(true);
@@ -91,6 +96,7 @@ export default function StaffPage() {
         body: JSON.stringify({
           name,
           phone,
+          password,
           role,
           commissionType,
           commissionValue: Number(commissionValue),
@@ -100,6 +106,7 @@ export default function StaffPage() {
       if (!data.ok) throw new Error(data.error ?? "Could not add staff member");
       setName("");
       setPhone("");
+      setPassword("");
       setRole("STYLIST");
       setCommissionType("PERCENT");
       setCommissionValue("40");
@@ -163,6 +170,27 @@ export default function StaffPage() {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setEditSubmitting(false);
+    }
+  }
+
+  async function handleResetPassword(e: FormEvent, staffId: string) {
+    e.preventDefault();
+    setError(null);
+    setResetSubmitting(true);
+    try {
+      const res = await fetch(`/api/staff/${staffId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "Could not reset password");
+      setResetPasswordFor(null);
+      setNewPassword("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setResetSubmitting(false);
     }
   }
 
@@ -243,20 +271,47 @@ export default function StaffPage() {
                     )}
                   </td>
                   <td>
-                    {s.role !== "OWNER" && (
-                      <div style={{ display: "flex", gap: 6 }}>
-                        {s.active ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => setResetPasswordFor(resetPasswordFor === s.id ? null : s.id)} style={{ fontSize: 12 }}>
+                        Reset password
+                      </button>
+                      {s.role !== "OWNER" &&
+                        (s.active ? (
                           <button onClick={() => handleToggleActive(s.id, false)}>Deactivate</button>
                         ) : (
                           <>
                             <button onClick={() => handleToggleActive(s.id, true)}>Reactivate</button>
                             <button onClick={() => handleDelete(s.id)}>Remove</button>
                           </>
-                        )}
-                      </div>
-                    )}
+                        ))}
+                    </div>
                   </td>
                 </tr>
+                {resetPasswordFor === s.id && (
+                  <tr>
+                    <td colSpan={7}>
+                      <form
+                        onSubmit={(e) => handleResetPassword(e, s.id)}
+                        style={{ display: "flex", gap: 8, alignItems: "flex-end", padding: "12px 0" }}
+                      >
+                        <label>
+                          New password
+                          <input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            minLength={8}
+                            required
+                            style={{ display: "block", padding: 8 }}
+                          />
+                        </label>
+                        <button type="submit" disabled={resetSubmitting}>
+                          {resetSubmitting ? "Saving..." : "Save"}
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                )}
                 {editFormFor === s.id && (
                   <tr>
                     <td colSpan={7}>
@@ -350,11 +405,22 @@ export default function StaffPage() {
           <input value={name} onChange={(e) => setName(e.target.value)} required style={{ display: "block", width: "100%", padding: 8 }} />
         </label>
         <label>
-          Phone (for OTP login later)
+          Phone (their login username)
           <input
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="2348012345678"
+            required
+            style={{ display: "block", width: "100%", padding: 8 }}
+          />
+        </label>
+        <label>
+          Password (share this with them — they can log in with it right away)
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            minLength={8}
             required
             style={{ display: "block", width: "100%", padding: 8 }}
           />

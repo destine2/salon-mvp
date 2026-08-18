@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { requireOwnerSession } from "@/lib/require-owner";
+import { hashPassword } from "@/lib/password";
 import { StaffRole, CommissionType } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
@@ -25,12 +26,15 @@ export async function POST(req: NextRequest) {
   const { session, error } = requireOwnerSession();
   if (error) return error;
 
-  const { name, phone, role, commissionType, commissionValue } = await req.json();
-  if (!name || !phone || !commissionType || commissionValue == null) {
+  const { name, phone, password, role, commissionType, commissionValue } = await req.json();
+  if (!name || !phone || !password || !commissionType || commissionValue == null) {
     return NextResponse.json(
-      { ok: false, error: "name, phone, commissionType, and commissionValue are required" },
+      { ok: false, error: "name, phone, password, commissionType, and commissionValue are required" },
       { status: 400 }
     );
+  }
+  if (password.length < 8) {
+    return NextResponse.json({ ok: false, error: "Password must be at least 8 characters." }, { status: 400 });
   }
 
   const existing = await prisma.staff.findUnique({ where: { phone } });
@@ -45,6 +49,7 @@ export async function POST(req: NextRequest) {
       salonId: session!.salonId,
       name,
       phone,
+      passwordHash: hashPassword(password),
       role: resolvedRole,
       commissionRule: {
         create: {

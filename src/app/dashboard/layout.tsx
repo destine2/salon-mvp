@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { registerAutoFlush, flushOutbox } from "@/lib/offline-sync";
 import { offlineDb } from "@/lib/offline-db";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [pending, setPending] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  }
 
   useEffect(() => {
     registerAutoFlush();
@@ -38,6 +45,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 16px" }}>
+        <button onClick={handleLogout} style={{ fontSize: 13 }}>
+          Log out
+        </button>
+      </div>
       {(!isOnline || pending > 0) && (
         <div
           style={{
