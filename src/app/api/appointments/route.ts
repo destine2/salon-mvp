@@ -47,6 +47,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Service not found" }, { status: 404 });
   }
 
+  const staff = await prisma.staff.findUnique({ where: { id: staffId } });
+  if (!staff || staff.salonId !== session.salonId) {
+    return NextResponse.json({ ok: false, error: "Staff member not found" }, { status: 404 });
+  }
+  if (!staff.active) {
+    return NextResponse.json({ ok: false, error: "This staff member is deactivated — reactivate them first." }, { status: 409 });
+  }
+
   const start = new Date(startTime);
   const available = await isSlotAvailable({ staffId, startTime: start, durationMin: service.durationMin });
   if (!available) {

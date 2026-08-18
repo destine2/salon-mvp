@@ -12,7 +12,7 @@ export async function GET(_req: Request, { params }: { params: { salonId: string
       name: true,
       city: true,
       services: { select: { id: true, name: true, priceNaira: true, durationMin: true } },
-      staff: { where: { role: { in: ["OWNER", "STYLIST"] } }, select: { id: true, name: true } },
+      staff: { where: { role: { in: ["OWNER", "STYLIST"] }, active: true }, select: { id: true, name: true } },
     },
   });
 

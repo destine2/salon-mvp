@@ -64,7 +64,7 @@ export default function CalendarPage() {
     try {
       const [apptRes, staffRes, serviceRes] = await Promise.all([
         fetch(`/api/appointments?date=${date}`),
-        fetch("/api/staff"),
+        fetch("/api/staff?active=true"),
         fetch("/api/services"),
       ]);
       const [apptData, staffData, serviceData] = await Promise.all([apptRes.json(), staffRes.json(), serviceRes.json()]);
@@ -270,6 +270,13 @@ export default function CalendarPage() {
                             <label>
                               Stylist{" "}
                               <select value={rsStaffId} onChange={(e) => setRsStaffId(e.target.value)} style={{ padding: 6 }}>
+                                {/* staffOptions only lists active staff — if this appointment's current
+                                    stylist has since been deactivated, they still need to appear here
+                                    (unchanged) so the select's value has a matching option and "Save"
+                                    without touching this field doesn't silently reassign the booking. */}
+                                {!staffOptions.some((s) => s.id === a.staff.id) && (
+                                  <option value={a.staff.id}>{a.staff.name} (inactive)</option>
+                                )}
                                 {staffOptions.map((s) => (
                                   <option key={s.id} value={s.id}>
                                     {s.name}

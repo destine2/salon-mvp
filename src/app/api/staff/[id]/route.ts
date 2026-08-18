@@ -13,11 +13,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json();
 
+  if (body.active === false && staff.role === "OWNER") {
+    return NextResponse.json({ ok: false, error: "Can't deactivate the owner account" }, { status: 400 });
+  }
+
   await prisma.staff.update({
     where: { id: params.id },
     data: {
       name: body.name ?? staff.name,
       role: body.role ?? staff.role,
+      active: body.active ?? staff.active,
     },
   });
 
@@ -58,8 +63,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   try {
     // CommissionRule doesn't cascade-delete with its Staff row by default,
     // so it has to go first. If the staff member already has appointments
-    // or transaction splits, this will still fail — that's intentional for
-    // now (no soft-delete/deactivate flow yet; see task list Phase 6).
+    // or transaction splits, this will still fail — permanently deleting
+    // someone with payment history would break every past transaction's
+    // "who was this split with" record, so it's left intentional. PATCH
+    // { active: false } is the alternative for that case (deactivate keeps
+    // the row and its history, just drops it from booking/dropdowns/login).
     await prisma.commissionRule.deleteMany({ where: { staffId: params.id } });
     await prisma.staff.delete({ where: { id: params.id } });
   } catch {
@@ -67,7 +75,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
       {
         ok: false,
         error:
-          "Can't remove this staff member — they already have bookings or payment history attached. A deactivate option is planned instead of hard delete.",
+          "Can't permanently remove this staff member — they already have bookings or payment history attached. Deactivate them instead.",
       },
       { status: 409 }
     );

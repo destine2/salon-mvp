@@ -17,6 +17,9 @@ export async function POST(req: NextRequest) {
       { status: 404 }
     );
   }
+  if (!staff.active) {
+    return NextResponse.json({ ok: false, error: "This account has been deactivated." }, { status: 403 });
+  }
 
   const result = await sendOtp(phone);
   return NextResponse.json({ ok: true, pinId: result.pinId });

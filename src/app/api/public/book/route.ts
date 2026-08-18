@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
   if (!staff || staff.salonId !== salonId) {
     return NextResponse.json({ ok: false, error: "Staff member not found" }, { status: 404 });
   }
+  // The booking page only ever offers active staff (see /api/public/salons),
+  // so this only fires against a stale page or a direct API call — but it's
+  // the actual enforcement point, not the dropdown filter.
+  if (!staff.active) {
+    return NextResponse.json({ ok: false, error: "This staff member is no longer taking bookings." }, { status: 409 });
+  }
 
   const start = new Date(startTime);
   const available = await isSlotAvailable({ staffId, startTime: start, durationMin: service.durationMin });

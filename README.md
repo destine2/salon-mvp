@@ -129,10 +129,16 @@ Known gaps worth knowing about before you rely on this:
 - Service worker registration is **production-only** (`register-sw.tsx`), so
   offline behaviour won't appear under `npm run dev`. Test it with
   `npm run build && npm start`, then use DevTools → Network → Offline.
-- Editing a staff member's commission rule doesn't update their existing
-  Paystack subaccount split automatically — the two can drift out of sync
-- Hard-deleting a staff member with existing bookings/payments will fail on
-  purpose (no soft-delete/deactivate flow yet)
+- ~~Editing a staff member's commission rule doesn't update their existing
+  Paystack subaccount split automatically~~ **Fixed** — every checkout now
+  recomputes the split from the current commission rule and sends it to
+  Paystack per-transaction, so the subaccount's stored percentage no longer
+  matters for correctness. See `ARCHITECTURE.md`.
+- ~~Hard-deleting a staff member with existing bookings/payments will fail on
+  purpose (no soft-delete/deactivate flow yet)~~ **Fixed** — staff now have
+  an `active` flag. Deactivating (Staff page → Deactivate) keeps their
+  history intact but drops them from booking, dropdowns, and login; hard
+  delete still exists for staff with no history at all.
 - Opening hours are salon-wide, not per-staff — one stylist working a
   different shift from the rest isn't modelled yet (PRD keeps per-staff
   schedules out of MVP)

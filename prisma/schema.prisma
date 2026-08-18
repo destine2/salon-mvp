@@ -53,6 +53,7 @@ model Staff {
   name          String
   phone         String     @unique // used for OTP login
   role          StaffRole  @default(STYLIST)
+  active        Boolean    @default(true) // deactivated staff keep their history but drop out of booking, dropdowns, and login — see src/app/api/staff/[id]/route.ts
   paystackSubaccountCode String? // set once the staff member's Paystack subaccount is created
   createdAt     DateTime   @default(now())
 

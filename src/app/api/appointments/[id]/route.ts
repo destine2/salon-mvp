@@ -58,6 +58,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (body.startTime || body.staffId) {
     const newStaffId = body.staffId ?? appointment.staffId;
+    // Only checked when actually reassigning to a different staff member —
+    // moving an existing appointment's time without changing who it's with
+    // must still work even if that staff has since been deactivated.
+    if (body.staffId && body.staffId !== appointment.staffId) {
+      const newStaff = await prisma.staff.findUnique({ where: { id: newStaffId } });
+      if (!newStaff || newStaff.salonId !== session.salonId) {
+        return NextResponse.json({ ok: false, error: "Staff member not found" }, { status: 404 });
+      }
+      if (!newStaff.active) {
+        return NextResponse.json({ ok: false, error: "This staff member is deactivated — reactivate them first." }, { status: 409 });
+      }
+    }
     const newStart = body.startTime ? new Date(body.startTime) : appointment.startTime;
     const available = await isSlotAvailable({
       staffId: newStaffId,

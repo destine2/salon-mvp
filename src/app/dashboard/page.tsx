@@ -32,7 +32,7 @@ export default async function DashboardPage() {
   // with zero services or zero non-owner staff, so call that out plainly.
   const [serviceCount, otherStaffCount, hoursCount] = await Promise.all([
     prisma.service.count({ where: { salonId: staff.salonId } }),
-    prisma.staff.count({ where: { salonId: staff.salonId, role: { not: "OWNER" } } }),
+    prisma.staff.count({ where: { salonId: staff.salonId, role: { not: "OWNER" }, active: true } }),
     prisma.businessHours.count({ where: { salonId: staff.salonId } }),
   ]);
   const setupSteps = [

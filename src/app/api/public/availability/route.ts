@@ -46,6 +46,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Service not found" }, { status: 404 });
   }
 
+  // The booking page only ever offers active staff, so this only fires
+  // against a stale page or a direct API call — but it's the actual
+  // enforcement point, same as the check in /api/public/book.
+  const staff = await prisma.staff.findUnique({ where: { id: staffId } });
+  if (!staff || staff.salonId !== service.salonId) {
+    return NextResponse.json({ ok: false, error: "Staff member not found" }, { status: 404 });
+  }
+  if (!staff.active) {
+    return NextResponse.json({ ok: false, error: "This staff member is no longer taking bookings." }, { status: 409 });
+  }
+
   // The Lagos day maps to a UTC window that starts the previous evening, so
   // bound the query by real instants rather than by calendar date.
   const dayStart = lagosToInstant(date, 0);

@@ -12,6 +12,7 @@ type StaffMember = {
   name: string;
   phone: string;
   role: "OWNER" | "STYLIST" | "APPRENTICE";
+  active: boolean;
   commissionRule: CommissionRule | null;
   paystackSubaccountCode: string | null;
 };
@@ -122,6 +123,22 @@ export default function StaffPage() {
     }
   }
 
+  async function handleToggleActive(id: string, active: boolean) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/staff/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "Could not update staff member");
+      await loadStaff();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    }
+  }
+
   function openEditForm(s: StaffMember) {
     setEditFormFor(editFormFor === s.id ? null : s.id);
     setEditType(s.commissionRule?.type ?? "PERCENT");
@@ -190,6 +207,7 @@ export default function StaffPage() {
               <th>Name</th>
               <th>Phone</th>
               <th>Role</th>
+              <th>Status</th>
               <th>Commission</th>
               <th>Payouts</th>
               <th />
@@ -198,10 +216,11 @@ export default function StaffPage() {
           <tbody>
             {staff.map((s) => (
               <Fragment key={s.id}>
-                <tr style={{ borderBottom: "1px solid #eee" }}>
+                <tr style={{ borderBottom: "1px solid #eee", opacity: s.active ? 1 : 0.6 }}>
                   <td>{s.name}</td>
                   <td>{s.phone}</td>
                   <td>{s.role}</td>
+                  <td>{s.active ? "Active" : "Inactive"}</td>
                   <td>
                     {s.commissionRule
                       ? s.commissionRule.type === "PERCENT"
@@ -223,11 +242,24 @@ export default function StaffPage() {
                       </button>
                     )}
                   </td>
-                  <td>{s.role !== "OWNER" && <button onClick={() => handleDelete(s.id)}>Remove</button>}</td>
+                  <td>
+                    {s.role !== "OWNER" && (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {s.active ? (
+                          <button onClick={() => handleToggleActive(s.id, false)}>Deactivate</button>
+                        ) : (
+                          <>
+                            <button onClick={() => handleToggleActive(s.id, true)}>Reactivate</button>
+                            <button onClick={() => handleDelete(s.id)}>Remove</button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </td>
                 </tr>
                 {editFormFor === s.id && (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <form
                         onSubmit={(e) => handleEditCommission(e, s.id)}
                         style={{ display: "flex", gap: 8, alignItems: "flex-end", padding: "12px 0" }}
@@ -265,7 +297,7 @@ export default function StaffPage() {
                 )}
                 {payoutFormFor === s.id && (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <form
                         onSubmit={(e) => handleSetUpPayouts(e, s.id)}
                         style={{ display: "grid", gap: 8, maxWidth: 320, padding: "12px 0" }}

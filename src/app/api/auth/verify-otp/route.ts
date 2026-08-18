@@ -26,6 +26,9 @@ export async function POST(req: NextRequest) {
       { status: 404 }
     );
   }
+  if (!staff.active) {
+    return NextResponse.json({ ok: false, error: "This account has been deactivated." }, { status: 403 });
+  }
 
   const token = createSessionToken({ staffId: staff.id, salonId: staff.salonId, role: staff.role });
   cookies().set(SESSION_COOKIE, token, {

@@ -4,12 +4,17 @@ import { getSession } from "@/lib/auth";
 import { requireOwnerSession } from "@/lib/require-owner";
 import { StaffRole, CommissionType } from "@prisma/client";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = getSession();
   if (!session) return NextResponse.json({ ok: false, error: "Not logged in" }, { status: 401 });
 
+  // The staff management page needs everyone, active or not, to offer
+  // reactivate/permanently-remove. Callers that only need people who can
+  // actually be booked (calendar dropdowns) pass ?active=true to filter.
+  const activeOnly = req.nextUrl.searchParams.get("active") === "true";
+
   const staff = await prisma.staff.findMany({
-    where: { salonId: session.salonId },
+    where: { salonId: session.salonId, ...(activeOnly ? { active: true } : {}) },
     include: { commissionRule: true },
     orderBy: { name: "asc" },
   });

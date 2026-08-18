@@ -1,0 +1,11 @@
+-- Hand-written rather than `prisma migrate dev` — see the header of
+-- 20260816095500_appointment_times_timestamptz/migration.sql for why
+-- (no shadow-database access against the Supabase pooler). Applied via
+-- `migrate deploy`.
+--
+-- Adds the deactivate flow: DELETE on a staff member with any bookings or
+-- payment history already 409s on the FK constraint (see
+-- src/app/api/staff/[id]/route.ts) — this column is the alternative. Every
+-- existing staff member defaults to active so nobody currently bookable
+-- drops out of availability the moment this migration runs.
+ALTER TABLE "Staff" ADD COLUMN "active" BOOLEAN NOT NULL DEFAULT true;
