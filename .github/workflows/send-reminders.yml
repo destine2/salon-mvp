@@ -1,0 +1,26 @@
+name: Send appointment reminders
+
+# Vercel's Hobby plan only allows daily cron jobs, but the reminder logic
+# (src/lib/reminders.ts) checks a +/-15 minute window around each
+# appointment's 24h and 2h mark, so it needs to run every 15 minutes to
+# actually catch them — this workflow is that schedule, free, running here
+# instead of as a Vercel cron. See README.md's deploy checklist.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab, for testing
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the reminder cron endpoint
+        run: |
+          status=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/send-reminders")
+          cat /tmp/response.txt
+          if [ "$status" -ge 300 ]; then
+            echo "Reminder endpoint returned HTTP $status"
+            exit 1
+          fi

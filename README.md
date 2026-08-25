@@ -117,8 +117,11 @@ implemented. Pages (all under `/dashboard` unless noted):
 - **Reports** (`/dashboard/reports`) — daily booked vs. collected, by
   method, flagged transactions
 - **Earnings** (`/dashboard/earnings`) — a staff member's own running total
-- **Reminders** — `/api/cron/send-reminders`, wired to run every 15 minutes
-  via `vercel.json` once deployed
+- **Reminders** — `/api/cron/send-reminders`, triggered every 15 minutes by
+  a GitHub Actions workflow (`.github/workflows/send-reminders.yml`) rather
+  than Vercel's own cron — Vercel's Hobby plan only allows daily crons, and
+  the reminder logic needs the tighter interval to catch each appointment's
+  24h/2h window (see the workflow file's comment)
 - **Offline** — two layers. Walk-ins and cash/transfer checkouts queue in
   IndexedDB (`src/lib/offline-db.ts`, `src/lib/offline-sync.ts`) and auto-sync
   when connectivity returns, with a banner in `src/app/dashboard/layout.tsx`.
@@ -239,10 +242,15 @@ actually run, not just `tsc`.
    Environment Variables, using your real (not test) Paystack/Termii keys
    once you're ready to go live, and set `NEXT_PUBLIC_APP_URL` to your real
    deployed URL.
-4. Vercel picks up `vercel.json` automatically for the reminder cron —
-   confirm it under Project Settings → Cron Jobs after the first deploy.
-   (Note: frequent/every-15-minutes cron schedules may require a paid
-   Vercel plan; check your plan's cron limits.)
+4. Add two GitHub repo secrets (Settings → Secrets and variables → Actions)
+   so `.github/workflows/send-reminders.yml` can call the reminder endpoint
+   every 15 minutes without needing Vercel Pro's cron: `CRON_SECRET` (the
+   same value you set in Vercel) and `APP_URL` (your deployed URL, no
+   trailing slash). Scheduled workflows only run on the default branch and
+   GitHub disables them after 60 days with no repo activity — a real risk
+   for a project that isn't touched often, worth knowing about even if it
+   doesn't matter today. You can trigger a run manually from the Actions
+   tab any time to confirm it's wired up correctly.
 5. Run your production database's migration: `npx prisma migrate deploy`
    (not `migrate dev`) against the production `DATABASE_URL`, then apply the
    constraints with `npm run db:constraints` against that same URL.

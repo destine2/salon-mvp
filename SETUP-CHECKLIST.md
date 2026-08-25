@@ -15,7 +15,7 @@ Ordered so the slowest queues start first and the biggest blocker clears soonest
 | 4 | Paystack test keys | 15 min | Checkout, splits, commissions |
 | 5 | Fill in `.env` | 5 min | Me, immediately |
 | 6 | GitHub remote | 10 min | Backup + Vercel deploy |
-| 7 | Vercel account | 10 min | Live URL, reminder cron |
+| 7 | Vercel account | 10 min | Live URL (reminder cron now runs via a free GitHub Actions workflow instead, since Vercel's Hobby plan only allows daily crons — see README's deploy checklist) |
 
 **A rule for all of it: never paste keys or secrets into chat.** Put them in
 `.env` yourself. I run the commands; the process reads the file. I never need to

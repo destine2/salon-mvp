@@ -15,7 +15,8 @@ function formatReminder(appt: ReminderAppointment, hoursOut: "24h" | "2h") {
 }
 
 /**
- * Runs on a schedule (see /api/cron/send-reminders + vercel.json). Reminders
+ * Runs on a schedule (see /api/cron/send-reminders +
+ * .github/workflows/send-reminders.yml). Reminders
  * are queued server-side rather than depending on the salon's own device
  * being online, per PRD 7.1 step 5 — this is what makes that true: it's a
  * cron job hitting the database directly, not something triggered from the
