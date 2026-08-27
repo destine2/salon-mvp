@@ -1,0 +1,314 @@
+/* Design system — extends the Veloura template's confirmed visual identity
+   (see PRODUCT.md > Brand Commitments; source tokens in
+   ../Salone/dist/veloura/css/style.css and BRAND_IDENTITY.md) rather than
+   inventing a separate one, so this SaaS reads as a sibling product to the
+   static-site business it grew out of.
+
+   Two registers of the same system, not two systems: the public booking
+   page (Persuade — a customer decides to trust this business) gets full
+   color/type commitment; the owner/staff dashboard (Operate — a tool used
+   many times a day) uses the same tokens more restrained, gold as an
+   accent rather than a field color, no script accents, so scanability
+   never loses to expression. */
+
+:root {
+  /* Brand — verbatim from the Veloura system */
+  --color-gold: #b38f5c;
+  --color-gold-rgb: 179, 143, 92;
+  --color-gold-dark: #96703f;
+  --color-sage: #7c8268;
+  --color-ink: #171310;
+  --color-cream: #f1eae0;
+  --color-whatsapp: #25d366;
+  --color-whatsapp-dark: #1da851;
+
+  /* Extended for app use — not in the source template, which never needed
+     surfaces, borders, or semantic states. Kept in the same warm-neutral
+     family as --color-ink/--color-cream rather than introducing cool grays. */
+  --color-ink-soft: #4a4038;
+  --color-ink-faint: #8a7f74;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #faf7f3;
+  --color-border: #e6ddd0;
+  --color-border-strong: #d6c9b6;
+
+  --color-success: #3f7d5c;
+  --color-success-bg: #e9f3ed;
+  --color-danger: #b3453f;
+  --color-danger-bg: #fbeceb;
+  --color-warning: #b3823f;
+  --color-warning-bg: #faf0e2;
+
+  /* Motion — verbatim from the Veloura system */
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --duration: 0.35s;
+  --shadow-card: 0 12px 40px rgba(37, 37, 37, 0.08);
+  --shadow-card-hover: 0 16px 44px rgba(37, 37, 37, 0.11);
+  --lift: -4px;
+
+  /* Spacing/radius scale — not in the source (a marketing site doesn't
+     need a table/form-density scale); chosen to sit comfortably against
+     the Veloura section-rhythm clamp() values already in use. */
+  --space-1: 0.375rem;
+  --space-2: 0.625rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.25rem;
+  --space-6: 3.5rem;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), "Playfair Display", serif;
+  color: var(--color-ink);
+  margin: 0 0 var(--space-2);
+  line-height: 1.15;
+}
+
+h1 {
+  font-size: clamp(1.75rem, 1.4rem + 1.5vw, 2.75rem);
+  font-weight: 600;
+}
+
+h2 {
+  font-size: clamp(1.375rem, 1.2rem + 0.8vw, 1.875rem);
+  font-weight: 600;
+}
+
+p {
+  margin: 0 0 var(--space-3);
+  color: var(--color-ink-soft);
+  line-height: 1.6;
+}
+
+a {
+  color: var(--color-gold-dark);
+}
+
+/* ---------------------------------------------------------------------
+   Buttons
+   --------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  font-family: var(--font-body), "Work Sans", sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  padding: 0.7em 1.4em;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    transform var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease),
+    background var(--duration) var(--ease),
+    border-color var(--duration) var(--ease),
+    opacity var(--duration) var(--ease);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--color-gold);
+  border-color: var(--color-gold);
+  color: #fff;
+}
+
+.btn-primary:not(:disabled):hover {
+  background: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
+  transform: translateY(var(--lift));
+  box-shadow: var(--shadow-card-hover);
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: var(--color-border-strong);
+  color: var(--color-ink);
+}
+
+.btn-secondary:not(:disabled):hover {
+  border-color: var(--color-gold);
+  color: var(--color-gold-dark);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-ink-soft);
+  padding: 0.5em 0.8em;
+}
+
+.btn-ghost:not(:disabled):hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+
+.btn-danger {
+  background: transparent;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.btn-danger:not(:disabled):hover {
+  background: var(--color-danger-bg);
+}
+
+.btn-sm {
+  font-size: 0.8125rem;
+  padding: 0.45em 0.9em;
+}
+
+/* ---------------------------------------------------------------------
+   Forms
+   --------------------------------------------------------------------- */
+
+.field {
+  display: block;
+  margin-bottom: var(--space-3);
+}
+
+.field-label {
+  display: block;
+  font-family: var(--font-body), "Work Sans", sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-ink-soft);
+  margin-bottom: var(--space-1);
+}
+
+.input,
+select.input,
+textarea.input {
+  display: block;
+  width: 100%;
+  font-family: var(--font-body), "Work Sans", sans-serif;
+  font-size: 0.9375rem;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.65em 0.85em;
+  transition:
+    border-color var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease);
+}
+
+.input:focus,
+select.input:focus,
+textarea.input:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(var(--color-gold-rgb), 0.18);
+}
+
+/* ---------------------------------------------------------------------
+   Surfaces
+   --------------------------------------------------------------------- */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.3em 0.75em;
+  border-radius: 999px;
+}
+
+.pill-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.pill-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.pill-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.pill-neutral {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-faint);
+  border: 1px solid var(--color-border);
+}
+
+.error-text {
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}
+
+/* ---------------------------------------------------------------------
+   App shell — header used across dashboard + auth pages
+   --------------------------------------------------------------------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-5);
+  background: var(--color-ink);
+  color: var(--color-cream);
+}
+
+.app-wordmark {
+  font-family: var(--font-display), "Playfair Display", serif;
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+}
+
+.app-wordmark-accent {
+  font-family: var(--font-script), "Dancing Script", cursive;
+  color: var(--color-gold);
+}

@@ -97,98 +97,225 @@ export default function PublicBookingPage() {
     }
   }
 
-  if (loading) return <main style={{ padding: "2.5rem" }}>Loading...</main>;
-  if (!salon) return <main style={{ padding: "2.5rem" }}>{error ?? "Salon not found"}</main>;
-
-  if (confirmed) {
+  if (loading) {
     return (
-      <main style={{ padding: "2.5rem", maxWidth: 420 }}>
-        <h1>Booked!</h1>
-        <p>
-          You're booked at {salon.name} on {new Date(selectedSlot!).toLocaleString()}. See you then.
-        </p>
+      <main style={page}>
+        <p style={{ color: "var(--color-ink-faint)" }}>Loading…</p>
       </main>
     );
   }
 
+  if (!salon) {
+    return (
+      <main style={page}>
+        <p className="error-text">{error ?? "Salon not found"}</p>
+      </main>
+    );
+  }
+
+  if (confirmed) {
+    return (
+      <main style={page}>
+        <div style={{ maxWidth: 440, margin: "0 auto", textAlign: "center", paddingTop: "10vh" }}>
+          <div style={checkCircle}>✓</div>
+          <h1 style={{ marginTop: "var(--space-4)" }}>You&rsquo;re booked</h1>
+          <p style={{ fontSize: "1.0625rem" }}>
+            {salon.name} is expecting you{" "}
+            <strong style={{ color: "var(--color-ink)" }}>
+              {new Date(selectedSlot!).toLocaleString([], {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </strong>
+            . See you then.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  const selectedService = salon.services.find((s) => s.id === serviceId);
+
   return (
-    <main style={{ padding: "2.5rem", maxWidth: 420 }}>
-      <h1>{salon.name}</h1>
-      {salon.city && <p style={{ color: "#666" }}>{salon.city}</p>}
+    <main style={page}>
+      <div style={{ maxWidth: 560, margin: "0 auto" }}>
+        <header style={{ marginBottom: "var(--space-5)" }}>
+          <p style={eyebrow}>Book your appointment</p>
+          <h1>{salon.name}</h1>
+          {salon.city && <p style={{ color: "var(--color-ink-faint)", marginBottom: 0 }}>{salon.city}</p>}
+        </header>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+        {error && <p className="error-text" style={{ marginBottom: "var(--space-3)" }}>{error}</p>}
 
-      <label>
-        Service
-        <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} style={{ display: "block", width: "100%", padding: 8, margin: "6px 0" }}>
-          {salon.services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} — ₦{Number(s.priceNaira).toLocaleString()} ({s.durationMin}min)
-            </option>
-          ))}
-        </select>
-      </label>
+        <section style={{ marginBottom: "var(--space-5)" }}>
+          <p style={sectionLabel}>1. Choose a service</p>
+          <div style={cardGrid}>
+            {salon.services.map((s) => (
+              <label key={s.id} style={selectCard(serviceId === s.id)}>
+                <input
+                  type="radio"
+                  name="service"
+                  value={s.id}
+                  checked={serviceId === s.id}
+                  onChange={() => setServiceId(s.id)}
+                  style={{ position: "absolute", opacity: 0 }}
+                />
+                <span style={{ fontWeight: 600 }}>{s.name}</span>
+                <span style={{ color: "var(--color-ink-faint)", fontSize: "0.875rem" }}>
+                  ₦{Number(s.priceNaira).toLocaleString()} · {s.durationMin} min
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
 
-      <label>
-        Stylist
-        <select value={staffId} onChange={(e) => setStaffId(e.target.value)} style={{ display: "block", width: "100%", padding: 8, margin: "6px 0" }}>
-          {salon.staff.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
+        <section style={{ marginBottom: "var(--space-5)" }}>
+          <p style={sectionLabel}>2. Choose a stylist</p>
+          <div style={cardGrid}>
+            {salon.staff.map((s) => (
+              <label key={s.id} style={selectCard(staffId === s.id)}>
+                <input
+                  type="radio"
+                  name="staff"
+                  value={s.id}
+                  checked={staffId === s.id}
+                  onChange={() => setStaffId(s.id)}
+                  style={{ position: "absolute", opacity: 0 }}
+                />
+                <span style={{ fontWeight: 600 }}>{s.name}</span>
+              </label>
+            ))}
+          </div>
+        </section>
 
-      <label>
-        Date
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ display: "block", width: "100%", padding: 8, margin: "6px 0" }} />
-      </label>
+        <section style={{ marginBottom: "var(--space-5)" }}>
+          <p style={sectionLabel}>3. Pick a date and time</p>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="input"
+            style={{ maxWidth: 220, marginBottom: "var(--space-3)" }}
+          />
 
-      <p style={{ marginTop: 12 }}>Available times</p>
-      {slotsLoading ? (
-        <p>Checking availability...</p>
-      ) : slots.length === 0 ? (
-        <p>No open slots that day — try another date.</p>
-      ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {slots.map((s) => (
-            <button
-              key={s}
-              onClick={() => setSelectedSlot(s)}
-              style={{
-                padding: "6px 10px",
-                border: selectedSlot === s ? "2px solid #333" : "1px solid #ccc",
-                background: selectedSlot === s ? "#eee" : "white",
-              }}
-            >
-              {new Date(s).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {slotsLoading ? (
+            <p style={{ color: "var(--color-ink-faint)" }}>Checking availability…</p>
+          ) : slots.length === 0 ? (
+            <p style={{ color: "var(--color-ink-faint)" }}>No open slots that day — try another date.</p>
+          ) : (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+              {slots.map((s) => (
+                <button key={s} onClick={() => setSelectedSlot(s)} style={slotButton(selectedSlot === s)}>
+                  {new Date(s).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {selectedSlot && (
+          <section className="card" style={{ animation: "fadeIn 0.35s ease" }}>
+            <p style={sectionLabel}>4. Your details</p>
+            <label className="field">
+              <span className="field-label">Your name</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} className="input" />
+            </label>
+            <label className="field">
+              <span className="field-label">Your phone (WhatsApp number)</span>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="2348012345678"
+                required
+                className="input"
+              />
+            </label>
+            <button onClick={handleConfirm} disabled={submitting || !phone} className="btn btn-primary" style={{ width: "100%" }}>
+              {submitting
+                ? "Booking…"
+                : `Confirm — ${selectedService ? "₦" + Number(selectedService.priceNaira).toLocaleString() : ""}`}
             </button>
-          ))}
-        </div>
-      )}
-
-      {selectedSlot && (
-        <div style={{ marginTop: 16 }}>
-          <label>
-            Your name
-            <input value={name} onChange={(e) => setName(e.target.value)} style={{ display: "block", width: "100%", padding: 8, margin: "6px 0" }} />
-          </label>
-          <label>
-            Your phone (WhatsApp number)
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="2348012345678"
-              required
-              style={{ display: "block", width: "100%", padding: 8, margin: "6px 0" }}
-            />
-          </label>
-          <button onClick={handleConfirm} disabled={submitting || !phone}>
-            {submitting ? "Booking..." : "Confirm booking"}
-          </button>
-        </div>
-      )}
+          </section>
+        )}
+      </div>
     </main>
   );
 }
+
+const page: React.CSSProperties = {
+  minHeight: "100vh",
+  padding: "var(--space-5) var(--space-3) var(--space-6)",
+  background: "var(--color-cream)",
+};
+
+const eyebrow: React.CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: "0.75rem",
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--color-gold-dark)",
+  marginBottom: "var(--space-1)",
+};
+
+const sectionLabel: React.CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: "0.8125rem",
+  fontWeight: 700,
+  letterSpacing: "0.02em",
+  color: "var(--color-ink-soft)",
+  marginBottom: "var(--space-2)",
+};
+
+const cardGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+  gap: "var(--space-2)",
+};
+
+function selectCard(active: boolean): React.CSSProperties {
+  return {
+    position: "relative",
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    padding: "var(--space-2) var(--space-3)",
+    borderRadius: "var(--radius-sm)",
+    border: active ? "1.5px solid var(--color-gold)" : "1px solid var(--color-border)",
+    background: active ? "rgba(var(--color-gold-rgb), 0.08)" : "var(--color-surface)",
+    cursor: "pointer",
+    transition: "border-color 0.35s ease, background 0.35s ease, box-shadow 0.35s ease",
+    boxShadow: active ? "var(--shadow-card)" : "none",
+  };
+}
+
+function slotButton(active: boolean): React.CSSProperties {
+  return {
+    fontFamily: "var(--font-body)",
+    fontSize: "0.875rem",
+    fontWeight: 600,
+    padding: "0.55em 0.9em",
+    borderRadius: "var(--radius-sm)",
+    border: active ? "1.5px solid var(--color-gold)" : "1px solid var(--color-border)",
+    background: active ? "var(--color-gold)" : "var(--color-surface)",
+    color: active ? "#fff" : "var(--color-ink)",
+    cursor: "pointer",
+    transition: "all 0.35s ease",
+  };
+}
+
+const checkCircle: React.CSSProperties = {
+  width: 64,
+  height: 64,
+  margin: "0 auto",
+  borderRadius: "50%",
+  background: "var(--color-success-bg)",
+  color: "var(--color-success)",
+  fontSize: "1.75rem",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
