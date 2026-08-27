@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { submitOrQueue } from "@/lib/offline-sync";
 
 type AppointmentDetail = {
@@ -87,52 +88,72 @@ export default function CheckoutPage() {
     }
   }
 
-  if (loading) return <main style={{ padding: "2.5rem" }}>Loading...</main>;
-  if (!appointment) return <main style={{ padding: "2.5rem" }}>{error ?? "Appointment not found"}</main>;
+  if (loading) {
+    return (
+      <main style={page}>
+        <p style={{ color: "var(--color-ink-faint)" }}>Loading…</p>
+      </main>
+    );
+  }
+  if (!appointment) {
+    return (
+      <main style={page}>
+        <p className="error-text">{error ?? "Appointment not found"}</p>
+      </main>
+    );
+  }
 
   if (queuedForSync) {
     return (
-      <main style={{ padding: "2.5rem", maxWidth: 420 }}>
-        <h1>Saved — will sync shortly</h1>
-        <p>No connection right now. This checkout is saved on this device and will sync automatically once you're back online.</p>
-        <p>
-          <a href="/dashboard/calendar">Back to calendar</a>
-        </p>
+      <main style={page}>
+        <div className="card" style={{ maxWidth: 420, margin: "0 auto", textAlign: "center" }}>
+          <div style={checkCircle}>⏳</div>
+          <h1 style={{ marginTop: "var(--space-3)" }}>Saved — will sync shortly</h1>
+          <p>No connection right now. This checkout is saved on this device and will sync automatically once you&rsquo;re back online.</p>
+          <Link href="/dashboard/calendar" className="btn btn-secondary">
+            Back to calendar
+          </Link>
+        </div>
       </main>
     );
   }
 
   if (appointment.transaction || result) {
     return (
-      <main style={{ padding: "2.5rem", maxWidth: 420 }}>
-        <h1>Checked out</h1>
-        {result?.isFlagged && (
-          <p style={{ color: "#b8860b" }}>
-            Heads up: the amount logged was less than the service price ({appointment.service.priceNaira}). This
-            has been flagged on the daily reconciliation summary.
-          </p>
-        )}
-        <p>
-          <a href="/dashboard/calendar">Back to calendar</a>
-        </p>
+      <main style={page}>
+        <div className="card" style={{ maxWidth: 420, margin: "0 auto", textAlign: "center" }}>
+          <div style={checkCircle}>✓</div>
+          <h1 style={{ marginTop: "var(--space-3)" }}>Checked out</h1>
+          {result?.isFlagged && (
+            <p style={{ color: "var(--color-warning)" }}>
+              Heads up: the amount logged was less than the service price (₦{Number(appointment.service.priceNaira).toLocaleString()}). This has
+              been flagged on the daily reconciliation summary.
+            </p>
+          )}
+          <Link href="/dashboard/calendar" className="btn btn-secondary">
+            Back to calendar
+          </Link>
+        </div>
       </main>
     );
   }
 
   return (
-    <main style={{ padding: "2.5rem", maxWidth: 420 }}>
-      <h1>Checkout</h1>
-      <p>
-        {appointment.service.name} — {appointment.customer.name || appointment.customer.phone} with {appointment.staff.name}
-      </p>
-      <p>Service price: ₦{Number(appointment.service.priceNaira).toLocaleString()}</p>
+    <main style={page}>
+      <div className="card" style={{ maxWidth: 420, margin: "0 auto" }}>
+        <h1 style={{ marginBottom: "var(--space-1)" }}>Checkout</h1>
+        <p style={{ marginBottom: "var(--space-1)" }}>
+          {appointment.service.name} — {appointment.customer.name || appointment.customer.phone} with {appointment.staff.name}
+        </p>
+        <p style={{ fontWeight: 700, color: "var(--color-ink)" }}>
+          Service price: ₦{Number(appointment.service.priceNaira).toLocaleString()}
+        </p>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+        {error && <p className="error-text">{error}</p>}
 
-      <div style={{ display: "grid", gap: 8, maxWidth: 320 }}>
-        <label>
-          Payment method
-          <select value={method} onChange={(e) => setMethod(e.target.value as Method)} style={{ display: "block", width: "100%", padding: 8 }}>
+        <label className="field">
+          <span className="field-label">Payment method</span>
+          <select value={method} onChange={(e) => setMethod(e.target.value as Method)} className="input">
             <option value="CASH">Cash</option>
             <option value="BANK_TRANSFER">Bank transfer (logged manually)</option>
             <option value="CARD_TRANSFER">Card / Paystack (in-app charge)</option>
@@ -142,37 +163,46 @@ export default function CheckoutPage() {
         {method === "CARD_TRANSFER" ? (
           <>
             {!appointment.staff.paystackSubaccountCode && (
-              <p style={{ color: "#b8860b" }}>
-                {appointment.staff.name} doesn't have payouts set up yet — set that up on the Staff page first,
-                or use Cash / Bank transfer for now.
+              <p style={{ color: "var(--color-warning)", fontSize: "0.875rem" }}>
+                {appointment.staff.name} doesn&rsquo;t have payouts set up yet — set that up on the Staff page first, or use Cash / Bank transfer
+                for now.
               </p>
             )}
-            <button onClick={handlePaystack} disabled={submitting || !appointment.staff.paystackSubaccountCode}>
-              {submitting ? "Starting payment..." : "Pay with Paystack"}
+            <button onClick={handlePaystack} disabled={submitting || !appointment.staff.paystackSubaccountCode} className="btn btn-primary" style={{ width: "100%" }}>
+              {submitting ? "Starting payment…" : "Pay with Paystack"}
             </button>
           </>
         ) : (
           <>
-            <label>
-              Amount received (₦)
-              <input
-                type="number"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                style={{ display: "block", width: "100%", padding: 8 }}
-              />
+            <label className="field">
+              <span className="field-label">Amount received (₦)</span>
+              <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} className="input" />
             </label>
-            <button onClick={handleCashOrTransfer} disabled={submitting}>
-              {submitting ? "Logging..." : "Log payment"}
+            <button onClick={handleCashOrTransfer} disabled={submitting} className="btn btn-primary" style={{ width: "100%" }}>
+              {submitting ? "Logging…" : "Log payment"}
             </button>
           </>
         )}
-      </div>
 
-      <p style={{ marginTop: 16 }}>
-        <button onClick={() => router.back()}>Back</button>
-      </p>
+        <button onClick={() => router.back()} className="btn btn-ghost btn-sm" style={{ marginTop: "var(--space-3)" }}>
+          ← Back
+        </button>
+      </div>
     </main>
   );
 }
+
+const page: React.CSSProperties = { padding: "var(--space-5) var(--space-3)", maxWidth: 640, margin: "0 auto" };
+
+const checkCircle: React.CSSProperties = {
+  width: 56,
+  height: 56,
+  margin: "0 auto",
+  borderRadius: "50%",
+  background: "var(--color-success-bg)",
+  color: "var(--color-success)",
+  fontSize: "1.5rem",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};

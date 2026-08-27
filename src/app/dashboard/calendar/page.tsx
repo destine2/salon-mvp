@@ -18,6 +18,14 @@ type Appointment = {
 type StaffOption = { id: string; name: string; role: string };
 type ServiceOption = { id: string; name: string; durationMin: number };
 
+const statusPillClass: Record<Appointment["status"], string> = {
+  BOOKED: "pill-neutral",
+  CONFIRMED: "pill-warning",
+  COMPLETED: "pill-success",
+  NO_SHOW: "pill-danger",
+  CANCELLED: "pill-neutral",
+};
+
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -203,146 +211,197 @@ export default function CalendarPage() {
   }
 
   return (
-    <main style={{ padding: "2.5rem", maxWidth: 820 }}>
-      <h1>Calendar</h1>
-      <label>
-        Date{" "}
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: 6 }} />
-      </label>
+    <main style={page}>
+      <Link href="/dashboard" style={backLink}>
+        ← Dashboard
+      </Link>
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-2)" }}>
+        <h1 style={{ marginBottom: 0 }}>Calendar</h1>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" style={{ maxWidth: 200 }} />
+      </header>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p className="error-text" style={{ marginTop: "var(--space-2)" }}>{error}</p>}
 
       {loading ? (
-        <p>Loading...</p>
+        <p style={{ color: "var(--color-ink-faint)", marginTop: "var(--space-3)" }}>Loading…</p>
       ) : appointments.length === 0 ? (
-        <p>No appointments for this day yet.</p>
+        <p style={{ color: "var(--color-ink-faint)", marginTop: "var(--space-3)" }}>No appointments for this day yet.</p>
       ) : (
         Array.from(byStaff.entries()).map(([staffId, appts]) => (
-          <section key={staffId} style={{ marginTop: "1.5rem" }}>
-            <h2 style={{ marginBottom: 4 }}>{appts[0].staff.name}</h2>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-                  <th>Time</th>
-                  <th>Customer</th>
-                  <th>Service</th>
-                  <th>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {appts.map((a) => (
-                  <Fragment key={a.id}>
-                    <tr style={{ borderBottom: reschedulingId === a.id ? "none" : "1px solid #eee" }}>
-                      <td>{new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
-                      <td>
-                        {a.customer.name || "—"} ({a.customer.phone}){a.isWalkIn ? " · walk-in" : ""}
-                      </td>
-                      <td>{a.service.name}</td>
-                      <td>{a.status}</td>
-                      <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {(a.status === "BOOKED" || a.status === "CONFIRMED") && (
-                          <>
-                            {a.status === "BOOKED" && (
-                              <button onClick={() => updateStatus(a.id, "CONFIRMED")}>Confirm</button>
-                            )}
-                            <Link href={`/dashboard/checkout/${a.id}`}>Checkout</Link>
-                            <button onClick={() => startReschedule(a)}>Reschedule</button>
-                            <button onClick={() => updateStatus(a.id, "NO_SHOW")}>No-show</button>
-                            <button onClick={() => updateStatus(a.id, "CANCELLED")}>Cancel</button>
-                          </>
-                        )}
-                        {a.status === "COMPLETED" && a.transaction && <span>Paid ✓</span>}
-                      </td>
-                    </tr>
-                    {reschedulingId === a.id && (
-                      <tr style={{ borderBottom: "1px solid #eee", background: "#f7f7f5" }}>
-                        <td colSpan={5} style={{ padding: "10px 4px" }}>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                            <label>
-                              Date{" "}
-                              <input type="date" value={rsDate} onChange={(e) => setRsDate(e.target.value)} style={{ padding: 6 }} />
-                            </label>
-                            <label>
-                              Time{" "}
-                              <input type="time" value={rsTime} onChange={(e) => setRsTime(e.target.value)} style={{ padding: 6 }} />
-                            </label>
-                            <label>
-                              Stylist{" "}
-                              <select value={rsStaffId} onChange={(e) => setRsStaffId(e.target.value)} style={{ padding: 6 }}>
-                                {/* staffOptions only lists active staff — if this appointment's current
-                                    stylist has since been deactivated, they still need to appear here
-                                    (unchanged) so the select's value has a matching option and "Save"
-                                    without touching this field doesn't silently reassign the booking. */}
-                                {!staffOptions.some((s) => s.id === a.staff.id) && (
-                                  <option value={a.staff.id}>{a.staff.name} (inactive)</option>
+          <section key={staffId} style={{ marginTop: "var(--space-4)" }}>
+            <h2 style={{ marginBottom: "var(--space-2)", fontSize: "1.125rem" }}>{appts[0].staff.name}</h2>
+            <div className="card" style={{ padding: 0, overflowX: "auto" }}>
+              <table style={table}>
+                <thead>
+                  <tr>
+                    <th style={th}>Time</th>
+                    <th style={th}>Customer</th>
+                    <th style={th}>Service</th>
+                    <th style={th}>Status</th>
+                    <th style={th} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {appts.map((a) => (
+                    <Fragment key={a.id}>
+                      <tr style={tr}>
+                        <td style={td}>{new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
+                        <td style={td}>
+                          {a.customer.name || "—"} ({a.customer.phone})
+                          {a.isWalkIn ? <span className="pill pill-neutral" style={{ marginLeft: "var(--space-1)" }}>Walk-in</span> : null}
+                        </td>
+                        <td style={td}>{a.service.name}</td>
+                        <td style={td}>
+                          <span className={`pill ${statusPillClass[a.status]}`}>{a.status.replace("_", "-")}</span>
+                        </td>
+                        <td style={{ ...td, textAlign: "right" }}>
+                          <div style={{ display: "flex", gap: "var(--space-1)", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                            {(a.status === "BOOKED" || a.status === "CONFIRMED") && (
+                              <>
+                                {a.status === "BOOKED" && (
+                                  <button onClick={() => updateStatus(a.id, "CONFIRMED")} className="btn btn-secondary btn-sm">
+                                    Confirm
+                                  </button>
                                 )}
-                                {staffOptions.map((s) => (
-                                  <option key={s.id} value={s.id}>
-                                    {s.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <button onClick={() => saveReschedule(a.id)} disabled={rsSaving}>
-                              {rsSaving ? "Saving..." : "Save"}
-                            </button>
-                            <button onClick={cancelReschedule} disabled={rsSaving} type="button">
-                              Cancel
-                            </button>
+                                <Link href={`/dashboard/checkout/${a.id}`} className="btn btn-primary btn-sm">
+                                  Checkout
+                                </Link>
+                                <button onClick={() => startReschedule(a)} className="btn btn-ghost btn-sm">
+                                  Reschedule
+                                </button>
+                                <button onClick={() => updateStatus(a.id, "NO_SHOW")} className="btn btn-danger btn-sm">
+                                  No-show
+                                </button>
+                                <button onClick={() => updateStatus(a.id, "CANCELLED")} className="btn btn-ghost btn-sm">
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                            {a.status === "COMPLETED" && a.transaction && <span className="pill pill-success">Paid ✓</span>}
                           </div>
-                          {rsError && <p style={{ color: "crimson", margin: "6px 0 0" }}>{rsError}</p>}
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
+                      {reschedulingId === a.id && (
+                        <tr style={tr}>
+                          <td colSpan={5} style={inlineFormCell}>
+                            <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
+                              <label className="field" style={{ marginBottom: 0 }}>
+                                <span className="field-label">Date</span>
+                                <input type="date" value={rsDate} onChange={(e) => setRsDate(e.target.value)} className="input" />
+                              </label>
+                              <label className="field" style={{ marginBottom: 0 }}>
+                                <span className="field-label">Time</span>
+                                <input type="time" value={rsTime} onChange={(e) => setRsTime(e.target.value)} className="input" />
+                              </label>
+                              <label className="field" style={{ marginBottom: 0 }}>
+                                <span className="field-label">Stylist</span>
+                                <select value={rsStaffId} onChange={(e) => setRsStaffId(e.target.value)} className="input">
+                                  {/* staffOptions only lists active staff — if this appointment's current
+                                      stylist has since been deactivated, they still need to appear here
+                                      (unchanged) so the select's value has a matching option and "Save"
+                                      without touching this field doesn't silently reassign the booking. */}
+                                  {!staffOptions.some((s) => s.id === a.staff.id) && (
+                                    <option value={a.staff.id}>{a.staff.name} (inactive)</option>
+                                  )}
+                                  {staffOptions.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <button onClick={() => saveReschedule(a.id)} disabled={rsSaving} className="btn btn-primary btn-sm">
+                                {rsSaving ? "Saving…" : "Save"}
+                              </button>
+                              <button onClick={cancelReschedule} disabled={rsSaving} type="button" className="btn btn-ghost btn-sm">
+                                Cancel
+                              </button>
+                            </div>
+                            {rsError && <p className="error-text" style={{ marginTop: "var(--space-2)", marginBottom: 0 }}>{rsError}</p>}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         ))
       )}
 
-      <h2 style={{ marginTop: "2rem" }}>Add a walk-in</h2>
-      <form onSubmit={handleWalkIn} style={{ display: "grid", gap: 8, maxWidth: 320 }}>
-        <label>
-          Staff
-          <select value={waStaffId} onChange={(e) => setWaStaffId(e.target.value)} style={{ display: "block", width: "100%", padding: 8 }}>
-            {staffOptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Service
-          <select value={waServiceId} onChange={(e) => setWaServiceId(e.target.value)} style={{ display: "block", width: "100%", padding: 8 }}>
-            {serviceOptions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Customer name (optional)
-          <input value={waCustomerName} onChange={(e) => setWaCustomerName(e.target.value)} style={{ display: "block", width: "100%", padding: 8 }} />
-        </label>
-        <label>
-          Customer phone
-          <input
-            value={waCustomerPhone}
-            onChange={(e) => setWaCustomerPhone(e.target.value)}
-            placeholder="2348012345678"
-            required
-            style={{ display: "block", width: "100%", padding: 8 }}
-          />
-        </label>
-        <button type="submit" disabled={submitting || !waStaffId || !waServiceId}>
-          {submitting ? "Adding..." : "Add walk-in (starts now)"}
-        </button>
-      </form>
+      <div className="card" style={{ maxWidth: 360, marginTop: "var(--space-5)" }}>
+        <h2 style={{ marginBottom: "var(--space-3)" }}>Add a walk-in</h2>
+        <form onSubmit={handleWalkIn}>
+          <label className="field">
+            <span className="field-label">Staff</span>
+            <select value={waStaffId} onChange={(e) => setWaStaffId(e.target.value)} className="input">
+              {staffOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">Service</span>
+            <select value={waServiceId} onChange={(e) => setWaServiceId(e.target.value)} className="input">
+              {serviceOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">Customer name (optional)</span>
+            <input value={waCustomerName} onChange={(e) => setWaCustomerName(e.target.value)} className="input" />
+          </label>
+          <label className="field">
+            <span className="field-label">Customer phone</span>
+            <input
+              value={waCustomerPhone}
+              onChange={(e) => setWaCustomerPhone(e.target.value)}
+              placeholder="2348012345678"
+              required
+              className="input"
+            />
+          </label>
+          <button type="submit" disabled={submitting || !waStaffId || !waServiceId} className="btn btn-primary" style={{ width: "100%" }}>
+            {submitting ? "Adding…" : "Add walk-in (starts now)"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
+
+const page: React.CSSProperties = { padding: "var(--space-5)", maxWidth: 900, margin: "0 auto" };
+
+const backLink: React.CSSProperties = {
+  display: "inline-block",
+  fontSize: "0.8125rem",
+  fontWeight: 600,
+  color: "var(--color-ink-faint)",
+  marginBottom: "var(--space-3)",
+};
+
+const table: React.CSSProperties = { width: "100%", minWidth: 640, borderCollapse: "collapse" };
+
+const th: React.CSSProperties = {
+  textAlign: "left",
+  fontSize: "0.75rem",
+  fontWeight: 700,
+  letterSpacing: "0.02em",
+  color: "var(--color-ink-faint)",
+  textTransform: "uppercase",
+  padding: "var(--space-2) var(--space-3)",
+  borderBottom: "1px solid var(--color-border)",
+  background: "var(--color-surface-sunken)",
+};
+
+const tr: React.CSSProperties = { borderBottom: "1px solid var(--color-border)" };
+
+const td: React.CSSProperties = { padding: "var(--space-2) var(--space-3)", fontSize: "0.9375rem", verticalAlign: "middle" };
+
+const inlineFormCell: React.CSSProperties = { padding: "var(--space-3)", background: "var(--color-surface-sunken)" };
