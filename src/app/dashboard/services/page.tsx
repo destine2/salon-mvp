@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 
 type Service = {
   id: string;
@@ -77,72 +78,96 @@ export default function ServicesPage() {
   }
 
   return (
-    <main style={{ padding: "2.5rem", maxWidth: 640 }}>
+    <main style={page}>
+      <Link href="/dashboard" style={backLink}>
+        ← Dashboard
+      </Link>
       <h1>Services</h1>
       <p>What you charge for, and how long each one takes — needed before booking can work.</p>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p className="error-text">{error}</p>}
 
       {loading ? (
-        <p>Loading...</p>
+        <p style={{ color: "var(--color-ink-faint)" }}>Loading…</p>
       ) : services.length === 0 ? (
-        <p>No services yet — add your first one below.</p>
+        <p style={{ color: "var(--color-ink-faint)" }}>No services yet — add your first one below.</p>
       ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", margin: "1rem 0" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-              <th>Name</th>
-              <th>Price (₦)</th>
-              <th>Duration (min)</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {services.map((s) => (
-              <tr key={s.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td>{s.name}</td>
-                <td>{Number(s.priceNaira).toLocaleString()}</td>
-                <td>{s.durationMin}</td>
-                <td>
-                  <button onClick={() => handleDelete(s.id)}>Remove</button>
-                </td>
+        <div className="card" style={{ padding: 0, overflowX: "auto", marginBottom: "var(--space-4)" }}>
+          <table style={table}>
+            <thead>
+              <tr>
+                <th style={th}>Name</th>
+                <th style={th}>Price (₦)</th>
+                <th style={th}>Duration (min)</th>
+                <th style={th} />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {services.map((s) => (
+                <tr key={s.id} style={tr}>
+                  <td style={td}>{s.name}</td>
+                  <td style={td}>{Number(s.priceNaira).toLocaleString()}</td>
+                  <td style={td}>{s.durationMin}</td>
+                  <td style={{ ...td, textAlign: "right" }}>
+                    <button onClick={() => handleDelete(s.id)} className="btn btn-danger btn-sm">
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <h2>Add a service</h2>
-      <form onSubmit={handleAdd} style={{ display: "grid", gap: 8, maxWidth: 320 }}>
-        <label>
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required style={{ display: "block", width: "100%", padding: 8 }} />
-        </label>
-        <label>
-          Price (₦)
-          <input
-            type="number"
-            min="0"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", padding: 8 }}
-          />
-        </label>
-        <label>
-          Duration (minutes)
-          <input
-            type="number"
-            min="1"
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            style={{ display: "block", width: "100%", padding: 8 }}
-          />
-        </label>
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Adding..." : "Add service"}
-        </button>
-      </form>
+      <div className="card" style={{ maxWidth: 360 }}>
+        <h2 style={{ marginBottom: "var(--space-3)" }}>Add a service</h2>
+        <form onSubmit={handleAdd}>
+          <label className="field">
+            <span className="field-label">Name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} required className="input" />
+          </label>
+          <label className="field">
+            <span className="field-label">Price (₦)</span>
+            <input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} required className="input" />
+          </label>
+          <label className="field">
+            <span className="field-label">Duration (minutes)</span>
+            <input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} className="input" />
+          </label>
+          <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: "100%" }}>
+            {submitting ? "Adding…" : "Add service"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
+
+const page: React.CSSProperties = { padding: "var(--space-5)", maxWidth: 780, margin: "0 auto" };
+
+const backLink: React.CSSProperties = {
+  display: "inline-block",
+  fontSize: "0.8125rem",
+  fontWeight: 600,
+  color: "var(--color-ink-faint)",
+  marginBottom: "var(--space-3)",
+};
+
+const table: React.CSSProperties = { width: "100%", minWidth: 460, borderCollapse: "collapse" };
+
+const th: React.CSSProperties = {
+  textAlign: "left",
+  fontSize: "0.75rem",
+  fontWeight: 700,
+  letterSpacing: "0.02em",
+  color: "var(--color-ink-faint)",
+  textTransform: "uppercase",
+  padding: "var(--space-2) var(--space-3)",
+  borderBottom: "1px solid var(--color-border)",
+  background: "var(--color-surface-sunken)",
+};
+
+const tr: React.CSSProperties = { borderBottom: "1px solid var(--color-border)" };
+
+const td: React.CSSProperties = { padding: "var(--space-2) var(--space-3)", fontSize: "0.9375rem" };

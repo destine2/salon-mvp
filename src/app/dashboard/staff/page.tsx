@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 
 type CommissionRule = {
   type: "PERCENT" | "FLAT" | "CHAIR_RENTAL";
@@ -218,247 +219,272 @@ export default function StaffPage() {
   }
 
   return (
-    <main style={{ padding: "2.5rem", maxWidth: 680 }}>
+    <main style={page}>
+      <Link href="/dashboard" style={backLink}>
+        ← Dashboard
+      </Link>
       <h1>Staff</h1>
       <p>Add each stylist/apprentice and how they get paid — this drives the automatic commission split at checkout later.</p>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p className="error-text">{error}</p>}
 
       {loading ? (
-        <p>Loading...</p>
+        <p style={{ color: "var(--color-ink-faint)" }}>Loading…</p>
       ) : staff.length === 0 ? (
-        <p>No staff yet.</p>
+        <p style={{ color: "var(--color-ink-faint)" }}>No staff yet.</p>
       ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", margin: "1rem 0" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-              <th>Name</th>
-              <th>Phone</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Commission</th>
-              <th>Payouts</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map((s) => (
-              <Fragment key={s.id}>
-                <tr style={{ borderBottom: "1px solid #eee", opacity: s.active ? 1 : 0.6 }}>
-                  <td>{s.name}</td>
-                  <td>{s.phone}</td>
-                  <td>{s.role}</td>
-                  <td>{s.active ? "Active" : "Inactive"}</td>
-                  <td>
-                    {s.commissionRule
-                      ? s.commissionRule.type === "PERCENT"
-                        ? `${Number(s.commissionRule.value)}%`
-                        : `₦${Number(s.commissionRule.value).toLocaleString()} (${commissionLabel[s.commissionRule.type]})`
-                      : "—"}{" "}
-                    <button onClick={() => openEditForm(s)} style={{ fontSize: 12 }}>
-                      Edit
-                    </button>
-                  </td>
-                  <td>
-                    {s.paystackSubaccountCode ? (
-                      "✓ ready"
-                    ) : (
-                      <button
-                        onClick={() => setPayoutFormFor(payoutFormFor === s.id ? null : s.id)}
-                      >
-                        Set up payouts
+        <div className="card" style={{ padding: 0, overflowX: "auto", marginBottom: "var(--space-4)" }}>
+          <table style={table}>
+            <thead>
+              <tr>
+                <th style={th}>Name</th>
+                <th style={th}>Phone</th>
+                <th style={th}>Role</th>
+                <th style={th}>Status</th>
+                <th style={th}>Commission</th>
+                <th style={th}>Payouts</th>
+                <th style={th} />
+              </tr>
+            </thead>
+            <tbody>
+              {staff.map((s) => (
+                <Fragment key={s.id}>
+                  <tr style={{ ...tr, opacity: s.active ? 1 : 0.6 }}>
+                    <td style={td}>{s.name}</td>
+                    <td style={td}>{s.phone}</td>
+                    <td style={td}>{s.role}</td>
+                    <td style={td}>
+                      <span className={`pill ${s.active ? "pill-success" : "pill-neutral"}`}>{s.active ? "Active" : "Inactive"}</span>
+                    </td>
+                    <td style={td}>
+                      {s.commissionRule
+                        ? s.commissionRule.type === "PERCENT"
+                          ? `${Number(s.commissionRule.value)}%`
+                          : `₦${Number(s.commissionRule.value).toLocaleString()} (${commissionLabel[s.commissionRule.type]})`
+                        : "—"}{" "}
+                      <button onClick={() => openEditForm(s)} className="btn btn-ghost btn-sm">
+                        Edit
                       </button>
-                    )}
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button onClick={() => setResetPasswordFor(resetPasswordFor === s.id ? null : s.id)} style={{ fontSize: 12 }}>
-                        Reset password
-                      </button>
-                      {s.role !== "OWNER" &&
-                        (s.active ? (
-                          <button onClick={() => handleToggleActive(s.id, false)}>Deactivate</button>
-                        ) : (
-                          <>
-                            <button onClick={() => handleToggleActive(s.id, true)}>Reactivate</button>
-                            <button onClick={() => handleDelete(s.id)}>Remove</button>
-                          </>
-                        ))}
-                    </div>
-                  </td>
-                </tr>
-                {resetPasswordFor === s.id && (
-                  <tr>
-                    <td colSpan={7}>
-                      <form
-                        onSubmit={(e) => handleResetPassword(e, s.id)}
-                        style={{ display: "flex", gap: 8, alignItems: "flex-end", padding: "12px 0" }}
-                      >
-                        <label>
-                          New password
-                          <input
-                            type="password"
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            minLength={8}
-                            required
-                            style={{ display: "block", padding: 8 }}
-                          />
-                        </label>
-                        <button type="submit" disabled={resetSubmitting}>
-                          {resetSubmitting ? "Saving..." : "Save"}
+                    </td>
+                    <td style={td}>
+                      {s.paystackSubaccountCode ? (
+                        <span className="pill pill-success">✓ Ready</span>
+                      ) : (
+                        <button onClick={() => setPayoutFormFor(payoutFormFor === s.id ? null : s.id)} className="btn btn-secondary btn-sm">
+                          Set up payouts
                         </button>
-                      </form>
+                      )}
+                    </td>
+                    <td style={td}>
+                      <div style={{ display: "flex", gap: "var(--space-1)", flexWrap: "wrap" }}>
+                        <button onClick={() => setResetPasswordFor(resetPasswordFor === s.id ? null : s.id)} className="btn btn-ghost btn-sm">
+                          Reset password
+                        </button>
+                        {s.role !== "OWNER" &&
+                          (s.active ? (
+                            <button onClick={() => handleToggleActive(s.id, false)} className="btn btn-secondary btn-sm">
+                              Deactivate
+                            </button>
+                          ) : (
+                            <>
+                              <button onClick={() => handleToggleActive(s.id, true)} className="btn btn-secondary btn-sm">
+                                Reactivate
+                              </button>
+                              <button onClick={() => handleDelete(s.id)} className="btn btn-danger btn-sm">
+                                Remove
+                              </button>
+                            </>
+                          ))}
+                      </div>
                     </td>
                   </tr>
-                )}
-                {editFormFor === s.id && (
-                  <tr>
-                    <td colSpan={7}>
-                      <form
-                        onSubmit={(e) => handleEditCommission(e, s.id)}
-                        style={{ display: "flex", gap: 8, alignItems: "flex-end", padding: "12px 0" }}
-                      >
-                        <label>
-                          Type
-                          <select value={editType} onChange={(e) => setEditType(e.target.value as CommissionRule["type"])} style={{ display: "block", padding: 8 }}>
-                            <option value="PERCENT">Percent</option>
-                            <option value="FLAT">Flat</option>
-                            <option value="CHAIR_RENTAL">Chair rental</option>
-                          </select>
-                        </label>
-                        <label>
-                          Value
-                          <input
-                            type="number"
-                            min="0"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            required
-                            style={{ display: "block", padding: 8, width: 120 }}
-                          />
-                        </label>
-                        <button type="submit" disabled={editSubmitting}>
-                          {editSubmitting ? "Saving..." : "Save"}
-                        </button>
-                        {s.paystackSubaccountCode && (
-                          <span style={{ fontSize: 12, color: "#b8860b" }}>
-                            Note: this won't update their existing Paystack payout split automatically.
-                          </span>
-                        )}
-                      </form>
-                    </td>
-                  </tr>
-                )}
-                {payoutFormFor === s.id && (
-                  <tr>
-                    <td colSpan={7}>
-                      <form
-                        onSubmit={(e) => handleSetUpPayouts(e, s.id)}
-                        style={{ display: "grid", gap: 8, maxWidth: 320, padding: "12px 0" }}
-                      >
-                        <label>
-                          Account name
-                          <input
-                            value={businessName}
-                            onChange={(e) => setBusinessName(e.target.value)}
-                            required
-                            style={{ display: "block", width: "100%", padding: 8 }}
-                          />
-                        </label>
-                        <label>
-                          Bank
-                          <select value={bankCode} onChange={(e) => setBankCode(e.target.value)} style={{ display: "block", width: "100%", padding: 8 }}>
-                            {NIGERIAN_BANKS.map((b) => (
-                              <option key={b.code} value={b.code}>
-                                {b.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          Account number
-                          <input
-                            value={accountNumber}
-                            onChange={(e) => setAccountNumber(e.target.value)}
-                            required
-                            style={{ display: "block", width: "100%", padding: 8 }}
-                          />
-                        </label>
-                        <button type="submit" disabled={payoutSubmitting}>
-                          {payoutSubmitting ? "Saving..." : "Save payout details"}
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+                  {resetPasswordFor === s.id && (
+                    <tr style={tr}>
+                      <td colSpan={7} style={inlineFormCell}>
+                        <form onSubmit={(e) => handleResetPassword(e, s.id)} style={inlineForm}>
+                          <label className="field" style={{ marginBottom: 0 }}>
+                            <span className="field-label">New password</span>
+                            <input
+                              type="password"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              minLength={8}
+                              required
+                              className="input"
+                            />
+                          </label>
+                          <button type="submit" disabled={resetSubmitting} className="btn btn-primary btn-sm">
+                            {resetSubmitting ? "Saving…" : "Save"}
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  )}
+                  {editFormFor === s.id && (
+                    <tr style={tr}>
+                      <td colSpan={7} style={inlineFormCell}>
+                        <form onSubmit={(e) => handleEditCommission(e, s.id)} style={inlineForm}>
+                          <label className="field" style={{ marginBottom: 0 }}>
+                            <span className="field-label">Type</span>
+                            <select
+                              value={editType}
+                              onChange={(e) => setEditType(e.target.value as CommissionRule["type"])}
+                              className="input"
+                            >
+                              <option value="PERCENT">Percent</option>
+                              <option value="FLAT">Flat</option>
+                              <option value="CHAIR_RENTAL">Chair rental</option>
+                            </select>
+                          </label>
+                          <label className="field" style={{ marginBottom: 0 }}>
+                            <span className="field-label">Value</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              required
+                              className="input"
+                              style={{ width: 120 }}
+                            />
+                          </label>
+                          <button type="submit" disabled={editSubmitting} className="btn btn-primary btn-sm">
+                            {editSubmitting ? "Saving…" : "Save"}
+                          </button>
+                          {s.paystackSubaccountCode && (
+                            <span style={{ fontSize: "0.75rem", color: "var(--color-warning)" }}>
+                              Note: this won&rsquo;t update their existing Paystack payout split automatically.
+                            </span>
+                          )}
+                        </form>
+                      </td>
+                    </tr>
+                  )}
+                  {payoutFormFor === s.id && (
+                    <tr style={tr}>
+                      <td colSpan={7} style={inlineFormCell}>
+                        <form onSubmit={(e) => handleSetUpPayouts(e, s.id)} style={{ display: "grid", gap: "var(--space-2)", maxWidth: 320 }}>
+                          <label className="field" style={{ marginBottom: 0 }}>
+                            <span className="field-label">Account name</span>
+                            <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} required className="input" />
+                          </label>
+                          <label className="field" style={{ marginBottom: 0 }}>
+                            <span className="field-label">Bank</span>
+                            <select value={bankCode} onChange={(e) => setBankCode(e.target.value)} className="input">
+                              {NIGERIAN_BANKS.map((b) => (
+                                <option key={b.code} value={b.code}>
+                                  {b.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="field" style={{ marginBottom: 0 }}>
+                            <span className="field-label">Account number</span>
+                            <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} required className="input" />
+                          </label>
+                          <button type="submit" disabled={payoutSubmitting} className="btn btn-primary btn-sm">
+                            {payoutSubmitting ? "Saving…" : "Save payout details"}
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <h2>Add a staff member</h2>
-      <form onSubmit={handleAdd} style={{ display: "grid", gap: 8, maxWidth: 340 }}>
-        <label>
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required style={{ display: "block", width: "100%", padding: 8 }} />
-        </label>
-        <label>
-          Phone (their login username)
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="2348012345678"
-            required
-            style={{ display: "block", width: "100%", padding: 8 }}
-          />
-        </label>
-        <label>
-          Password (share this with them — they can log in with it right away)
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
-            required
-            style={{ display: "block", width: "100%", padding: 8 }}
-          />
-        </label>
-        <label>
-          Role
-          <select value={role} onChange={(e) => setRole(e.target.value as StaffMember["role"])} style={{ display: "block", width: "100%", padding: 8 }}>
-            <option value="STYLIST">Stylist</option>
-            <option value="APPRENTICE">Apprentice</option>
-          </select>
-        </label>
-        <label>
-          Commission type
-          <select
-            value={commissionType}
-            onChange={(e) => setCommissionType(e.target.value as CommissionRule["type"])}
-            style={{ display: "block", width: "100%", padding: 8 }}
-          >
-            <option value="PERCENT">Percent of service</option>
-            <option value="FLAT">Flat amount per service</option>
-            <option value="CHAIR_RENTAL">Chair rental (fixed)</option>
-          </select>
-        </label>
-        <label>
-          {commissionType === "PERCENT" ? "Percent (e.g. 40)" : "Amount (₦)"}
-          <input
-            type="number"
-            min="0"
-            value={commissionValue}
-            onChange={(e) => setCommissionValue(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", padding: 8 }}
-          />
-        </label>
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Adding..." : "Add staff member"}
-        </button>
-      </form>
+      <div className="card" style={{ maxWidth: 380 }}>
+        <h2 style={{ marginBottom: "var(--space-3)" }}>Add a staff member</h2>
+        <form onSubmit={handleAdd}>
+          <label className="field">
+            <span className="field-label">Name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} required className="input" />
+          </label>
+          <label className="field">
+            <span className="field-label">Phone (their login username)</span>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="2348012345678" required className="input" />
+          </label>
+          <label className="field">
+            <span className="field-label">Password (share this with them — they can log in right away)</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
+              required
+              className="input"
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">Role</span>
+            <select value={role} onChange={(e) => setRole(e.target.value as StaffMember["role"])} className="input">
+              <option value="STYLIST">Stylist</option>
+              <option value="APPRENTICE">Apprentice</option>
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">Commission type</span>
+            <select
+              value={commissionType}
+              onChange={(e) => setCommissionType(e.target.value as CommissionRule["type"])}
+              className="input"
+            >
+              <option value="PERCENT">Percent of service</option>
+              <option value="FLAT">Flat amount per service</option>
+              <option value="CHAIR_RENTAL">Chair rental (fixed)</option>
+            </select>
+          </label>
+          <label className="field">
+            <span className="field-label">{commissionType === "PERCENT" ? "Percent (e.g. 40)" : "Amount (₦)"}</span>
+            <input
+              type="number"
+              min="0"
+              value={commissionValue}
+              onChange={(e) => setCommissionValue(e.target.value)}
+              required
+              className="input"
+            />
+          </label>
+          <button type="submit" disabled={submitting} className="btn btn-primary" style={{ width: "100%" }}>
+            {submitting ? "Adding…" : "Add staff member"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }
+
+const page: React.CSSProperties = { padding: "var(--space-5)", maxWidth: 900, margin: "0 auto" };
+
+const backLink: React.CSSProperties = {
+  display: "inline-block",
+  fontSize: "0.8125rem",
+  fontWeight: 600,
+  color: "var(--color-ink-faint)",
+  marginBottom: "var(--space-3)",
+};
+
+const table: React.CSSProperties = { width: "100%", minWidth: 780, borderCollapse: "collapse" };
+
+const th: React.CSSProperties = {
+  textAlign: "left",
+  fontSize: "0.75rem",
+  fontWeight: 700,
+  letterSpacing: "0.02em",
+  color: "var(--color-ink-faint)",
+  textTransform: "uppercase",
+  padding: "var(--space-2) var(--space-3)",
+  borderBottom: "1px solid var(--color-border)",
+  background: "var(--color-surface-sunken)",
+};
+
+const tr: React.CSSProperties = { borderBottom: "1px solid var(--color-border)" };
+
+const td: React.CSSProperties = { padding: "var(--space-2) var(--space-3)", fontSize: "0.9375rem", verticalAlign: "middle" };
+
+const inlineFormCell: React.CSSProperties = { padding: "var(--space-3)", background: "var(--color-surface-sunken)" };
+
+const inlineForm: React.CSSProperties = { display: "flex", gap: "var(--space-3)", alignItems: "flex-end", flexWrap: "wrap" };

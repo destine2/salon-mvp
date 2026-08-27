@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 const DAYS = [
   { weekday: 1, label: "Monday" },
@@ -82,74 +83,77 @@ export default function HoursPage() {
     }
   }
 
-  if (loading) return <main style={{ padding: "2.5rem" }}>Loading...</main>;
+  if (loading) {
+    return (
+      <main style={page}>
+        <p style={{ color: "var(--color-ink-faint)" }}>Loading…</p>
+      </main>
+    );
+  }
 
   return (
-    <main style={{ padding: "2.5rem", maxWidth: 560 }}>
+    <main style={page}>
+      <Link href="/dashboard" style={backLink}>
+        ← Dashboard
+      </Link>
       <h1>Opening hours</h1>
-      <p style={{ color: "#5a544c", lineHeight: 1.6 }}>
-        Customers can only book inside these hours. Times are Lagos time.
-      </p>
+      <p>Customers can only book inside these hours. Times are Lagos time.</p>
 
       {neverConfigured && (
-        <p style={{ background: "#fff8e1", padding: "0.75rem 1rem", lineHeight: 1.6 }}>
-          You haven&apos;t set your hours yet, so bookings currently use the default 9:00–19:00,
-          every day. Set your real hours below.
-        </p>
+        <div className="card" style={{ borderColor: "var(--color-warning)", background: "var(--color-warning-bg)", marginBottom: "var(--space-4)" }}>
+          <p style={{ margin: 0, color: "var(--color-ink)" }}>
+            You haven&rsquo;t set your hours yet, so bookings currently use the default 9:00–19:00, every day. Set your real hours below.
+          </p>
+        </div>
       )}
 
-      <div style={{ marginTop: 20 }}>
-        {DAYS.map((d) => {
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        {DAYS.map((d, i) => {
           const day = state[d.weekday];
           return (
-            <div
-              key={d.weekday}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "10px 0",
-                borderBottom: "1px solid #eee",
-              }}
-            >
-              <label style={{ width: 130, display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={day.open}
-                  onChange={(e) => update(d.weekday, { open: e.target.checked })}
-                />
+            <div key={d.weekday} style={{ ...dayRow, borderBottom: i === DAYS.length - 1 ? "none" : "1px solid var(--color-border)" }}>
+              <label style={{ width: 140, display: "flex", alignItems: "center", gap: "var(--space-2)", fontWeight: 600 }}>
+                <input type="checkbox" checked={day.open} onChange={(e) => update(d.weekday, { open: e.target.checked })} />
                 {d.label}
               </label>
               {day.open ? (
-                <>
-                  <input
-                    type="time"
-                    value={day.opens}
-                    onChange={(e) => update(d.weekday, { opens: e.target.value })}
-                    style={{ padding: 6 }}
-                  />
-                  <span>to</span>
-                  <input
-                    type="time"
-                    value={day.closes}
-                    onChange={(e) => update(d.weekday, { closes: e.target.value })}
-                    style={{ padding: 6 }}
-                  />
-                </>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <input type="time" value={day.opens} onChange={(e) => update(d.weekday, { opens: e.target.value })} className="input" />
+                  <span style={{ color: "var(--color-ink-faint)" }}>to</span>
+                  <input type="time" value={day.closes} onChange={(e) => update(d.weekday, { closes: e.target.value })} className="input" />
+                </div>
               ) : (
-                <span style={{ color: "#999" }}>Closed</span>
+                <span className="pill pill-neutral">Closed</span>
               )}
             </div>
           );
         })}
       </div>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-      {message && <p style={{ color: "#1d7a4c" }}>{message}</p>}
+      {error && <p className="error-text" style={{ marginTop: "var(--space-3)" }}>{error}</p>}
+      {message && <p style={{ color: "var(--color-success)", marginTop: "var(--space-3)" }}>{message}</p>}
 
-      <button onClick={save} disabled={saving} style={{ marginTop: 20, padding: "0.7rem 1.4rem" }}>
-        {saving ? "Saving..." : "Save hours"}
+      <button onClick={save} disabled={saving} className="btn btn-primary" style={{ marginTop: "var(--space-4)" }}>
+        {saving ? "Saving…" : "Save hours"}
       </button>
     </main>
   );
 }
+
+const page: React.CSSProperties = { padding: "var(--space-5)", maxWidth: 640, margin: "0 auto" };
+
+const backLink: React.CSSProperties = {
+  display: "inline-block",
+  fontSize: "0.8125rem",
+  fontWeight: 600,
+  color: "var(--color-ink-faint)",
+  marginBottom: "var(--space-3)",
+};
+
+const dayRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-3)",
+  padding: "var(--space-3)",
+  flexWrap: "wrap",
+};

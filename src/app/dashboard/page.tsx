@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import CopyLinkButton from "./copy-link-button";
 
 // First cut of the "protected route wrapper" from the task list: any page
 // that needs a logged-in owner/staff calls getSession() and redirects if
@@ -44,50 +45,88 @@ export default async function DashboardPage() {
   ];
   const setupIncomplete = setupSteps.some((s) => !s.done);
 
+  const navItems = [
+    { href: "/dashboard/calendar", label: "Today's calendar", desc: "Walk-ins, confirmations, reschedules" },
+    { href: "/dashboard/services", label: "Services", desc: "Prices and durations" },
+    { href: "/dashboard/staff", label: "Staff & commission", desc: "Payouts, roles, commission rules" },
+    { href: "/dashboard/hours", label: "Opening hours", desc: "Per-weekday open/close times" },
+    { href: "/dashboard/reports", label: "Daily reconciliation", desc: "Booked vs. collected, flagged payments" },
+    { href: "/dashboard/earnings", label: "My earnings", desc: "Your own running total" },
+  ];
+
   return (
-    <main style={{ padding: "2.5rem" }}>
-      <h1>{staff.salon.name}</h1>
-      <p>
-        Logged in as {staff.name} ({staff.role})
-      </p>
+    <main style={{ padding: "var(--space-5)", maxWidth: 880, margin: "0 auto" }}>
+      <header style={{ marginBottom: "var(--space-4)" }}>
+        <h1>{staff.salon.name}</h1>
+        <span className="pill pill-neutral">
+          {staff.name} · {staff.role}
+        </span>
+      </header>
 
       {setupIncomplete && (
-        <div style={{ background: "#e7f1ff", padding: "12px 16px", margin: "12px 0", maxWidth: 420 }}>
-          <strong>Before customers can book:</strong>
-          <ul style={{ marginBottom: 0 }}>
+        <div
+          className="card"
+          style={{ marginBottom: "var(--space-4)", borderColor: "var(--color-warning)", background: "var(--color-warning-bg)" }}
+        >
+          <p style={{ fontWeight: 700, color: "var(--color-ink)", marginBottom: "var(--space-2)" }}>Before customers can book</p>
+          <ul style={{ margin: 0, paddingLeft: "1.2em", color: "var(--color-ink-soft)" }}>
             {setupSteps.map((s) => (
-              <li key={s.label} style={{ textDecoration: s.done ? "line-through" : "none" }}>
-                {s.done ? "✓ " : ""}
-                <Link href={s.href}>{s.label}</Link>
+              <li key={s.label} style={{ marginBottom: "var(--space-1)" }}>
+                {s.done ? (
+                  <span style={{ color: "var(--color-success)", textDecoration: "line-through" }}>{s.label}</span>
+                ) : (
+                  <Link href={s.href}>{s.label}</Link>
+                )}
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      <ul>
-        <li>
-          <Link href="/dashboard/calendar">Today's calendar & walk-ins</Link>
-        </li>
-        <li>
-          <Link href="/dashboard/services">Manage services</Link>
-        </li>
-        <li>
-          <Link href="/dashboard/staff">Manage staff & commission</Link>
-        </li>
-        <li>
-          <Link href="/dashboard/hours">Opening hours</Link>
-        </li>
-        <li>
-          <Link href="/dashboard/reports">Daily reconciliation</Link>
-        </li>
-        <li>
-          <Link href="/dashboard/earnings">My earnings</Link>
-        </li>
-      </ul>
-      <p>
-        Customer booking link (share this on WhatsApp): <code>{bookingLink}</code>
-      </p>
+      <div style={navGrid}>
+        {navItems.map((item) => (
+          <Link key={item.href} href={item.href} className="card" style={navCard}>
+            <span style={{ fontWeight: 700, color: "var(--color-ink)" }}>{item.label}</span>
+            <span style={{ fontSize: "0.8125rem", color: "var(--color-ink-faint)" }}>{item.desc}</span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="card" style={{ marginTop: "var(--space-4)" }}>
+        <p className="field-label" style={{ marginBottom: "var(--space-2)" }}>
+          Customer booking link — share this on WhatsApp
+        </p>
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+          <code style={linkCode}>{bookingLink}</code>
+          <CopyLinkButton link={bookingLink} />
+        </div>
+      </div>
     </main>
   );
 }
+
+const navGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+  gap: "var(--space-3)",
+};
+
+const navCard: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  textDecoration: "none",
+};
+
+const linkCode: React.CSSProperties = {
+  flex: 1,
+  minWidth: 200,
+  fontFamily: "monospace",
+  fontSize: "0.875rem",
+  padding: "0.5em 0.75em",
+  background: "var(--color-surface-sunken)",
+  border: "1px solid var(--color-border)",
+  borderRadius: "var(--radius-sm)",
+  color: "var(--color-ink-soft)",
+  wordBreak: "break-all",
+};

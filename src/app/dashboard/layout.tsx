@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { registerAutoFlush, flushOutbox } from "@/lib/offline-sync";
 import { offlineDb } from "@/lib/offline-db";
 
@@ -44,24 +45,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 16px" }}>
-        <button onClick={handleLogout} style={{ fontSize: 13 }}>
+    <div style={{ minHeight: "100vh", background: "var(--color-surface-sunken)" }}>
+      <header className="app-header">
+        <Link href="/dashboard" className="app-wordmark">
+          Salon<span className="app-wordmark-accent">MVP</span>
+        </Link>
+        <button onClick={handleLogout} className="btn btn-ghost btn-sm" style={{ color: "var(--color-cream)" }}>
           Log out
         </button>
-      </div>
+      </header>
+
       {(!isOnline || pending > 0) && (
         <div
           style={{
-            background: isOnline ? "#fff3cd" : "#f8d7da",
-            padding: "8px 16px",
-            fontSize: 14,
+            background: isOnline ? "var(--color-warning-bg)" : "var(--color-danger-bg)",
+            color: isOnline ? "var(--color-warning)" : "var(--color-danger)",
+            padding: "var(--space-2) var(--space-5)",
+            fontSize: "0.875rem",
+            fontWeight: 600,
           }}
         >
           {!isOnline && "You're offline — walk-ins and cash checkouts still save, and will sync once you're back online. "}
           {pending > 0 && `${pending} change${pending === 1 ? "" : "s"} waiting to sync.`}
         </div>
       )}
+
       {children}
     </div>
   );

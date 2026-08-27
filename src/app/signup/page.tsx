@@ -35,69 +35,74 @@ export default function SignupPage() {
   }
 
   return (
-    <main style={{ padding: "2.5rem", maxWidth: 380 }}>
-      <h1>Set up your salon</h1>
-      <p>Create your salon and owner account — you'll be logged in right away.</p>
+    <main style={authPage}>
+      <div style={{ width: "100%", maxWidth: 420 }}>
+        <div style={{ textAlign: "center", marginBottom: "var(--space-5)" }}>
+          <span className="app-wordmark" style={{ color: "var(--color-ink)" }}>
+            Salon<span className="app-wordmark-accent">MVP</span>
+          </span>
+        </div>
 
-      <form onSubmit={handleSignup}>
-        <label>
-          Salon name
-          <input
-            value={salonName}
-            onChange={(e) => setSalonName(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", padding: 8, margin: "8px 0" }}
-          />
-        </label>
-        <label>
-          City (optional)
-          <input
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            style={{ display: "block", width: "100%", padding: 8, margin: "8px 0" }}
-          />
-        </label>
-        <label>
-          Your name
-          <input
-            value={ownerName}
-            onChange={(e) => setOwnerName(e.target.value)}
-            required
-            style={{ display: "block", width: "100%", padding: 8, margin: "8px 0" }}
-          />
-        </label>
-        <label>
-          Phone number (this is how you'll log in)
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="2348012345678"
-            required
-            style={{ display: "block", width: "100%", padding: 8, margin: "8px 0" }}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
-            required
-            style={{ display: "block", width: "100%", padding: 8, margin: "8px 0" }}
-          />
-        </label>
-        <button type="submit" disabled={loading}>
-          {loading ? "Creating your salon..." : "Create salon"}
-        </button>
-      </form>
+        <div className="card">
+          <h2 style={{ marginBottom: "var(--space-1)" }}>Set up your salon</h2>
+          <p style={{ marginBottom: "var(--space-4)" }}>You&rsquo;ll be logged in right away.</p>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+          <form onSubmit={handleSignup}>
+            <label className="field">
+              <span className="field-label">Salon name</span>
+              <input value={salonName} onChange={(e) => setSalonName(e.target.value)} required className="input" />
+            </label>
+            <label className="field">
+              <span className="field-label">City (optional)</span>
+              <input value={city} onChange={(e) => setCity(e.target.value)} className="input" />
+            </label>
+            <label className="field">
+              <span className="field-label">Your name</span>
+              <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required className="input" />
+            </label>
+            <label className="field">
+              <span className="field-label">Phone number (this is how you&rsquo;ll log in)</span>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="2348012345678"
+                required
+                className="input"
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                required
+                className="input"
+              />
+            </label>
+            <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%", marginTop: "var(--space-2)" }}>
+              {loading ? "Creating your salon…" : "Create salon"}
+            </button>
+          </form>
 
-      <p style={{ marginTop: "1.5rem" }}>
-        Already have an account? <Link href="/login">Log in</Link>
-      </p>
+          {error && <p className="error-text" style={{ marginTop: "var(--space-3)", marginBottom: 0 }}>{error}</p>}
+        </div>
+
+        <p style={{ textAlign: "center", marginTop: "var(--space-4)" }}>
+          Already have an account? <Link href="/login">Log in</Link>
+        </p>
+      </div>
     </main>
   );
 }
+
+const authPage: React.CSSProperties = {
+  minHeight: "100vh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "var(--space-4)",
+  background: "var(--color-cream)",
+};
