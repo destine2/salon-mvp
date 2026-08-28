@@ -12,6 +12,7 @@ type AppointmentDetail = {
   customer: { name: string | null; phone: string };
   staff: { id: string; name: string; paystackSubaccountCode: string | null };
   transaction: { id: string } | null;
+  deposit: { status: "PENDING" | "PAID"; amountNaira: string } | null;
 };
 
 type Method = "CASH" | "BANK_TRANSFER" | "CARD_TRANSFER";
@@ -36,7 +37,8 @@ export default function CheckoutPage() {
       .then((data) => {
         if (!data.ok) throw new Error(data.error ?? "Appointment not found");
         setAppointment(data.appointment);
-        setAmount(data.appointment.service.priceNaira);
+        const depositPaid = data.appointment.deposit?.status === "PAID" ? Number(data.appointment.deposit.amountNaira) : 0;
+        setAmount(String(Number(data.appointment.service.priceNaira) - depositPaid));
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong"))
       .finally(() => setLoading(false));
@@ -148,6 +150,12 @@ export default function CheckoutPage() {
         <p style={{ fontWeight: 700, color: "var(--color-ink)" }}>
           Service price: ₦{Number(appointment.service.priceNaira).toLocaleString()}
         </p>
+        {appointment.deposit?.status === "PAID" && (
+          <p style={{ color: "var(--color-success)", fontSize: "0.875rem" }}>
+            ₦{Number(appointment.deposit.amountNaira).toLocaleString()} deposit already paid — balance due: ₦
+            {(Number(appointment.service.priceNaira) - Number(appointment.deposit.amountNaira)).toLocaleString()}
+          </p>
+        )}
 
         {error && <p className="error-text">{error}</p>}
 

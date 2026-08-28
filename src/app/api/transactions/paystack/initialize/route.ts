@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointmentId },
-    include: { service: true, staff: { include: { commissionRule: true } }, customer: true, transaction: true },
+    include: { service: true, staff: { include: { commissionRule: true } }, customer: true, transaction: true, deposit: true },
   });
   if (!appointment || appointment.salonId !== session.salonId) {
     return NextResponse.json({ ok: false, error: "Appointment not found" }, { status: 404 });
@@ -56,15 +56,33 @@ export async function POST(req: NextRequest) {
   // PERCENT rule edited after the subaccount was first set up.
   const servicePriceNaira = Number(appointment.service.priceNaira);
   const rule = appointment.staff.commissionRule;
+  // Computed on the FULL price — this is the staff's true total entitlement,
+  // same as it's always been for a non-deposit checkout.
   const split = rule ? calculateSplit(rule, servicePriceNaira) : { ownerShare: servicePriceNaira, staffShare: 0 };
+
+  // If a deposit was already paid, only the remaining balance is charged
+  // here — the deposit itself is a plain, non-split charge to the owner
+  // (see src/lib/paystack.ts#initializeTransaction), so this transaction is
+  // the staff's *only* chance to receive their cut via Paystack.
+  const depositAlreadyPaid = appointment.deposit?.status === "PAID" ? Number(appointment.deposit.amountNaira) : 0;
+  const balanceNaira = servicePriceNaira - depositAlreadyPaid;
+  // Give the staff their full entitlement out of this transaction, and the
+  // owner whatever's left of the balance — clamped at 0, never negative.
+  // Edge case, flagged rather than silently mishandled: if the deposit was
+  // large enough that the staff's true share exceeds the remaining balance,
+  // Paystack can't route more than the transaction amount to the subaccount,
+  // so the staff receives the full balance here and the shortfall is not
+  // automatically settled — same category as a CASH shortfall, which this
+  // app already only flags rather than auto-correcting.
+  const ownerShareOfBalance = Math.max(0, balanceNaira - split.staffShare);
 
   let result;
   try {
     result = await initializeSplitTransaction({
       email: placeholderEmail,
-      amountKobo: Math.round(servicePriceNaira * 100),
+      amountKobo: Math.round(balanceNaira * 100),
       subaccountCode: appointment.staff.paystackSubaccountCode,
-      ownerShareKobo: Math.round(split.ownerShare * 100),
+      ownerShareKobo: Math.round(ownerShareOfBalance * 100),
       reference: appointment.id,
       callbackUrl: `${appUrl}/checkout/paystack-callback`,
     });

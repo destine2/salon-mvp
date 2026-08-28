@@ -9,7 +9,7 @@
  */
 
 /** Statuses that occupy a stylist's time. Mirrors the SQL constraint's WHERE. */
-export const ACTIVE_STATUSES = ["BOOKED", "CONFIRMED", "COMPLETED"] as const;
+export const ACTIVE_STATUSES = ["HELD", "BOOKED", "CONFIRMED", "COMPLETED"] as const;
 
 export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
 

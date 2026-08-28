@@ -18,13 +18,21 @@
  */
 
 export type ReconcilableStatus =
+  | "HELD"
   | "BOOKED"
   | "CONFIRMED"
   | "COMPLETED"
   | "NO_SHOW"
   | "CANCELLED";
 
-/** Statuses that mean "this appointment is still expected to happen". */
+/**
+ * Statuses that mean "this appointment is still expected to happen".
+ *
+ * HELD is deliberately excluded, not an oversight: it's a deposit-required
+ * public booking awaiting payment, and it always resolves to BOOKED (paid)
+ * or CANCELLED (the sweep job releases an expired hold) within minutes —
+ * hours before its endTime could ever make it look unaccounted for.
+ */
 const OPEN_STATUSES: ReconcilableStatus[] = ["BOOKED", "CONFIRMED"];
 
 export interface ReconcilableAppointment {

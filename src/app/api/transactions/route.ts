@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   const appointment = await prisma.appointment.findUnique({
     where: { id: appointmentId },
-    include: { service: true, staff: { include: { commissionRule: true } }, transaction: true },
+    include: { service: true, staff: { include: { commissionRule: true } }, transaction: true, deposit: true },
   });
   if (!appointment || appointment.salonId !== session.salonId) {
     return NextResponse.json({ ok: false, error: "Appointment not found" }, { status: 404 });
@@ -35,7 +35,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "This appointment has already been checked out." }, { status: 409 });
   }
 
-  const amount = Number(amountNaira);
+  // amountNaira from this form is the balance being logged right now — if a
+  // deposit was already paid at booking time, the true total collected for
+  // this appointment is deposit + this amount, and every downstream number
+  // (isFlagged, the commission split, the stored Transaction.amountNaira)
+  // needs to be computed on that total, not just today's entry, or a
+  // deposit-enabled salon's checkouts would look under-collected and staff
+  // would be under-paid on commission by exactly the deposit amount.
+  const depositAlreadyPaid = appointment.deposit?.status === "PAID" ? Number(appointment.deposit.amountNaira) : 0;
+  const amount = Number(amountNaira) + depositAlreadyPaid;
   const servicePrice = Number(appointment.service.priceNaira);
   // The payment-integrity check: logging less than the service's price is
   // exactly the "staff quietly discounts and pockets the difference"

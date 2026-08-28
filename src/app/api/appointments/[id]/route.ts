@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const appointment = await prisma.appointment.findUnique({
     where: { id: params.id },
-    include: { staff: { include: { commissionRule: true } }, customer: true, service: true, transaction: { include: { splits: true } } },
+    include: { staff: { include: { commissionRule: true } }, customer: true, service: true, transaction: { include: { splits: true } }, deposit: true },
   });
   if (!appointment || appointment.salonId !== session.salonId) {
     return NextResponse.json({ ok: false, error: "Appointment not found" }, { status: 404 });

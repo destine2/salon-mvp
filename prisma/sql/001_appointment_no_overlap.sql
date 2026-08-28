@@ -65,7 +65,9 @@ $$;
 
 -- '[)' — a booking ending at 12:00 does not conflict with one starting at
 -- 12:00. Only live statuses participate: CANCELLED and NO_SHOW free the slot,
--- matching ACTIVE_STATUSES in src/lib/scheduling.ts.
+-- matching ACTIVE_STATUSES in src/lib/overlap.ts. HELD (a deposit-required
+-- public booking awaiting payment) blocks the slot too — the whole point of
+-- holding it is that nobody else can take it while payment is pending.
 ALTER TABLE "Appointment"
     DROP CONSTRAINT IF EXISTS appointment_no_overlap;
 
@@ -75,4 +77,4 @@ ALTER TABLE "Appointment"
         "staffId" WITH =,
         appointment_slot_range("startTime", "endTime") WITH &&
     )
-    WHERE (status IN ('BOOKED', 'CONFIRMED', 'COMPLETED'));
+    WHERE (status IN ('HELD', 'BOOKED', 'CONFIRMED', 'COMPLETED'));

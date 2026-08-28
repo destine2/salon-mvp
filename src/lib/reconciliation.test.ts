@@ -43,6 +43,14 @@ test("closed-out appointments are never unaccounted", () => {
   }
 });
 
+test("a HELD appointment is never unaccounted, no matter how far past its endTime", () => {
+  // HELD is a deposit-required public booking awaiting payment — it always
+  // resolves to BOOKED or CANCELLED within minutes (the sweep job), so it
+  // should never show up here even if something went wrong and it lingered.
+  const heldLongAgo = appt({ status: "HELD", endTime: new Date(2020, 0, 1) });
+  assert.strictEqual(isUnaccounted(heldLongAgo, NOW), false);
+});
+
 test("an appointment still in progress is not yet unaccounted", () => {
   // Ends at 15:30, now is 15:00 — flagging this would train owners to ignore
   // the list.

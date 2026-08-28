@@ -27,6 +27,10 @@ model Salon {
   name      String
   city      String?
   tier      SalonTier @default(FREE)
+  // 0 = deposits disabled (default — every existing salon keeps today's
+  // behavior: book straight to BOOKED, pay at checkout). Salon-level only,
+  // not per-service — see the plan's "deposit defaults" wording.
+  depositPercent Int @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -185,6 +189,11 @@ model Appointment {
   endTime    DateTime @db.Timestamptz(3)
   status     AppointmentStatus @default(BOOKED)
   isWalkIn   Boolean  @default(false)
+  // Only set while status = HELD (a deposit-required public booking awaiting
+  // payment). The sweep job (src/app/api/cron/release-expired-holds) cancels
+  // any HELD appointment past this — see prisma/sql/001_appointment_no_overlap.sql
+  // for why HELD still blocks the slot in the meantime.
+  holdExpiresAt DateTime? @db.Timestamptz(3)
 
   // Reminder tracking (Phase 5) — set once each reminder actually sends, so
   // the reminder cron job never double-sends if it runs more than once.
@@ -195,11 +204,17 @@ model Appointment {
   updatedAt  DateTime @updatedAt
 
   transaction Transaction?
+  deposit     Deposit?
 
   @@index([staffId, startTime])
 }
 
 enum AppointmentStatus {
+  // Deposit required, awaiting payment — see holdExpiresAt above. Never
+  // reachable except via a deposit-enabled salon's public booking route;
+  // always resolves to BOOKED (paid) or CANCELLED (hold expired) within
+  // minutes, so it never lingers long enough to affect reconciliation.
+  HELD
   BOOKED
   CONFIRMED
   COMPLETED
@@ -210,6 +225,36 @@ enum AppointmentStatus {
 // ---------------------------------------------------------------------------
 // Payment integrity — the core differentiator (PRD section 5.2)
 // ---------------------------------------------------------------------------
+
+// A deposit paid at booking time to move an appointment HELD -> BOOKED.
+// Kept separate from Transaction rather than reused: Transaction means "this
+// checkout is settled" everywhere else in the app (reports, isFlagged,
+// findIntegrityAnomalies all assume one Transaction = one completed
+// checkout) — overloading it to also mean "a deposit toward an unfinished
+// booking" would touch every reporting query. Collected as a plain,
+// non-split Paystack charge to the salon's own account (see
+// src/lib/paystack.ts#initializeTransaction) — never split via subaccount,
+// because splitting a FLAT/CHAIR_RENTAL rule's fixed amount across two
+// separate payments (deposit now, balance at checkout) does not sum to the
+// same result as computing it once on the full price. The full commission
+// split still happens exactly once, at final checkout, accounting for
+// whatever was already collected here — see /api/transactions/route.ts.
+model Deposit {
+  id            String   @id @default(cuid())
+  appointmentId String   @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  amountNaira   Decimal  @db.Decimal(10, 2)
+  status        DepositStatus @default(PENDING)
+  paystackRef   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+enum DepositStatus {
+  PENDING
+  PAID
+}
 
 model Transaction {
   id            String   @id @default(cuid())

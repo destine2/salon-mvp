@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   // Our reference IS the appointmentId (see paystack/initialize).
   const appointment = await prisma.appointment.findUnique({
     where: { id: reference },
-    include: { service: true, staff: { include: { commissionRule: true } }, transaction: { include: { splits: true } } },
+    include: { service: true, staff: { include: { commissionRule: true } }, transaction: { include: { splits: true } }, deposit: true },
   });
   if (!appointment) {
     return NextResponse.json({ ok: false, error: "Appointment not found for this reference" }, { status: 404 });
@@ -31,8 +31,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Payment was not successful." }, { status: 402 });
   }
 
-  const amount = result.data.amount / 100; // kobo -> naira
+  const paidNow = result.data.amount / 100; // kobo -> naira, just this Paystack transaction
   const servicePrice = Number(appointment.service.priceNaira);
+  // If a deposit was already paid at booking time, the true total collected
+  // is deposit + this transaction — same reasoning as the cash/transfer
+  // route: every downstream number has to reflect the total, or a
+  // deposit-enabled salon's checkouts look under-collected and staff get
+  // under-recorded on commission by exactly the deposit amount.
+  const depositAlreadyPaid = appointment.deposit?.status === "PAID" ? Number(appointment.deposit.amountNaira) : 0;
+  const amount = paidNow + depositAlreadyPaid;
   const isFlagged = amount < servicePrice;
 
   const rule = appointment.staff.commissionRule;
@@ -54,6 +61,19 @@ export async function GET(req: NextRequest) {
   // because it's a narrow window on an action (editing commission rules)
   // that doesn't happen mid-checkout in practice, and this is worth
   // revisiting if that assumption ever stops holding.
+  //
+  // Second, deposit-specific gap, same "recorded, not silently wrong" spirit:
+  // when a deposit ate into what should have been the staff's cut (their true
+  // entitlement here exceeds `paidNow`), /paystack/initialize already clamped
+  // what it asked Paystack to send the subaccount at 0 rather than negative —
+  // meaning Paystack actually transferred at most `paidNow`, not the full
+  // entitlement recomputed below. The split recorded here is still the
+  // correct true entitlement (what reports should show is owed), but
+  // settledViaPaystack: true on the staff row can overstate what was
+  // automatically paid out in that specific edge case; the shortfall isn't
+  // separately tracked. Rare in practice (only when a large deposit meets a
+  // high-commission staff member), and the same category as this app's other
+  // deliberately-manual edges (refunds, cash shortfalls).
   const split = rule ? calculateSplit(rule, amount) : { ownerShare: amount, staffShare: 0 };
 
   const transaction = await prisma.$transaction(async (tx) => {

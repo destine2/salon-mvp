@@ -17,7 +17,14 @@ import { useParams } from "next/navigation";
 
 type Service = { id: string; name: string; priceNaira: string; durationMin: number };
 type StaffOption = { id: string; name: string };
-type Salon = { id: string; name: string; city: string | null; services: Service[]; staff: StaffOption[] };
+type Salon = {
+  id: string;
+  name: string;
+  city: string | null;
+  depositPercent: number;
+  services: Service[];
+  staff: StaffOption[];
+};
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -42,6 +49,14 @@ export default function PublicBookingPage() {
   const [phone, setPhone] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Set once /api/public/book returns requiresDeposit: true — the
+  // appointment is HELD (10-minute window) and the customer is one click
+  // from being redirected to pay it. Distinct from `confirmed`, which is
+  // only reached once a booking needs no deposit at all, or a deposit is
+  // already paid.
+  const [pendingDeposit, setPendingDeposit] = useState<{ appointmentId: string; amountNaira: number } | null>(null);
+  const [depositError, setDepositError] = useState<string | null>(null);
+  const [startingPayment, setStartingPayment] = useState(false);
 
   useEffect(() => {
     fetch(`/api/public/salons/${salonId}`)
@@ -89,11 +104,30 @@ export default function PublicBookingPage() {
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error ?? "Could not book that slot");
-      setConfirmed(true);
+      if (data.requiresDeposit) {
+        setPendingDeposit({ appointmentId: data.appointmentId, amountNaira: data.depositAmountNaira });
+      } else {
+        setConfirmed(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handlePayDeposit() {
+    if (!pendingDeposit) return;
+    setDepositError(null);
+    setStartingPayment(true);
+    try {
+      const res = await fetch(`/api/public/book/${pendingDeposit.appointmentId}/deposit`, { method: "POST" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "Could not start the deposit payment");
+      window.location.href = data.authorizationUrl;
+    } catch (err) {
+      setDepositError(err instanceof Error ? err.message : "Something went wrong");
+      setStartingPayment(false);
     }
   }
 
@@ -109,6 +143,24 @@ export default function PublicBookingPage() {
     return (
       <main style={page}>
         <p className="error-text">{error ?? "Salon not found"}</p>
+      </main>
+    );
+  }
+
+  if (pendingDeposit) {
+    return (
+      <main style={page}>
+        <div style={{ maxWidth: 440, margin: "0 auto", textAlign: "center", paddingTop: "10vh" }}>
+          <h1>Your slot is on hold</h1>
+          <p style={{ fontSize: "1.0625rem" }}>
+            Pay the ₦{pendingDeposit.amountNaira.toLocaleString()} deposit within the next 10 minutes to confirm it —
+            after that, it&rsquo;s released for someone else to book.
+          </p>
+          {depositError && <p className="error-text">{depositError}</p>}
+          <button onClick={handlePayDeposit} disabled={startingPayment} className="btn btn-primary" style={{ width: "100%", maxWidth: 320 }}>
+            {startingPayment ? "Starting payment…" : `Pay deposit — ₦${pendingDeposit.amountNaira.toLocaleString()}`}
+          </button>
+        </div>
       </main>
     );
   }
@@ -236,8 +288,15 @@ export default function PublicBookingPage() {
             <button onClick={handleConfirm} disabled={submitting || !phone} className="btn btn-primary" style={{ width: "100%" }}>
               {submitting
                 ? "Booking…"
-                : `Confirm — ${selectedService ? "₦" + Number(selectedService.priceNaira).toLocaleString() : ""}`}
+                : salon.depositPercent > 0
+                  ? `Hold this slot — ${salon.depositPercent}% deposit required`
+                  : `Confirm — ${selectedService ? "₦" + Number(selectedService.priceNaira).toLocaleString() : ""}`}
             </button>
+            {salon.depositPercent > 0 && (
+              <p style={{ fontSize: "0.8125rem", color: "var(--color-ink-faint)", marginTop: "var(--space-2)", marginBottom: 0 }}>
+                This salon holds your slot for 10 minutes while you pay a {salon.depositPercent}% deposit to confirm it.
+              </p>
+            )}
           </section>
         )}
       </div>

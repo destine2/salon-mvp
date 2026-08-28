@@ -89,6 +89,32 @@ export async function initializeSplitTransaction(params: {
   return data; // data.data.authorization_url -> redirect/open for the customer to pay
 }
 
+/**
+ * Initialize a plain (non-split) charge to the salon's own Paystack account —
+ * used only for deposits (src/app/api/public/book/[id]/deposit/route.ts).
+ *
+ * Deliberately never split via subaccount: splitting a FLAT/CHAIR_RENTAL
+ * commission rule's fixed amount across two separate payments (a deposit now,
+ * the balance at checkout) does not sum to the same result as computing it
+ * once on the full price — see calculateSplit() in src/lib/commission.ts and
+ * the comment on Deposit in prisma/schema.prisma. The full commission split
+ * still happens exactly once, at final checkout, on the true total collected.
+ */
+export async function initializeTransaction(params: {
+  email: string;
+  amountKobo: number;
+  reference: string;
+  callbackUrl?: string;
+}) {
+  const { data } = await paystack.post("/transaction/initialize", {
+    email: params.email,
+    amount: params.amountKobo,
+    reference: params.reference,
+    callback_url: params.callbackUrl,
+  });
+  return data; // data.data.authorization_url -> redirect/open for the customer to pay
+}
+
 /** Confirm a transaction actually settled before marking an appointment paid. */
 export async function verifyTransaction(reference: string) {
   const { data } = await paystack.get(`/transaction/verify/${reference}`);

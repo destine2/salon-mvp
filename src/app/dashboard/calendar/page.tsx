@@ -7,7 +7,7 @@ import { submitOrQueue } from "@/lib/offline-sync";
 type Appointment = {
   id: string;
   startTime: string;
-  status: "BOOKED" | "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
+  status: "HELD" | "BOOKED" | "CONFIRMED" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
   isWalkIn: boolean;
   staff: { id: string; name: string };
   customer: { name: string | null; phone: string };
@@ -19,6 +19,9 @@ type StaffOption = { id: string; name: string; role: string };
 type ServiceOption = { id: string; name: string; durationMin: number };
 
 const statusPillClass: Record<Appointment["status"], string> = {
+  // Awaiting a deposit payment, not yet actually confirmed — same "not yet
+  // settled" register as CONFIRMED, but for a different reason.
+  HELD: "pill-warning",
   BOOKED: "pill-neutral",
   CONFIRMED: "pill-warning",
   COMPLETED: "pill-success",

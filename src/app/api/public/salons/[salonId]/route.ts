@@ -11,6 +11,7 @@ export async function GET(_req: Request, { params }: { params: { salonId: string
       id: true,
       name: true,
       city: true,
+      depositPercent: true,
       services: { select: { id: true, name: true, priceNaira: true, durationMin: true } },
       staff: { where: { role: { in: ["OWNER", "STYLIST"] }, active: true }, select: { id: true, name: true } },
     },

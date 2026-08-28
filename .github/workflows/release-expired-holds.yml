@@ -1,0 +1,27 @@
+name: Release expired appointment holds
+
+# A deposit-required public booking is HELD for 10 minutes
+# (src/app/api/public/book/route.ts) while the customer pays — this sweeps
+# any that expired unpaid back to CANCELLED, freeing the slot. Same reasoning
+# as send-reminders.yml for running here instead of Vercel's cron (Hobby plan
+# only allows daily), but every 5 minutes: a 10-minute hold needs finer
+# sweeping than a 24h/2h reminder window does.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab, for testing
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the hold-release cron endpoint
+        run: |
+          status=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/release-expired-holds")
+          cat /tmp/response.txt
+          if [ "$status" -ge 300 ]; then
+            echo "Hold-release endpoint returned HTTP $status"
+            exit 1
+          fi

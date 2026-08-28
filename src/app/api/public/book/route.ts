@@ -18,6 +18,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const salon = await prisma.salon.findUnique({ where: { id: salonId } });
+  if (!salon) {
+    return NextResponse.json({ ok: false, error: "Salon not found" }, { status: 404 });
+  }
+
   const service = await prisma.service.findUnique({ where: { id: serviceId } });
   if (!service || service.salonId !== salonId) {
     return NextResponse.json({ ok: false, error: "Service not found" }, { status: 404 });
@@ -46,6 +51,15 @@ export async function POST(req: NextRequest) {
     create: { salonId, phone: customerPhone, name: customerName ?? null },
   });
 
+  // Opt-in per salon (Salon.depositPercent, default 0) — an existing salon
+  // that never turns this on keeps exactly today's behavior: straight to
+  // BOOKED, pay at checkout. Only a salon that sets a percentage above 0
+  // gets the hold-then-pay-a-deposit flow.
+  const requiresDeposit = salon.depositPercent > 0;
+  const servicePriceNaira = Number(service.priceNaira);
+  const depositAmountNaira = requiresDeposit ? Math.round(servicePriceNaira * salon.depositPercent) / 100 : 0;
+  const HOLD_MINUTES = 10;
+
   // The check above can be overtaken by a concurrent booking, so the database
   // constraint is the real arbiter. Losing that race is an ordinary outcome,
   // not a server fault — report it as the same 409 the pre-check returns.
@@ -59,10 +73,19 @@ export async function POST(req: NextRequest) {
         startTime: start,
         endTime: appointmentEndTime(start, service.durationMin),
         isWalkIn: false,
-        status: "BOOKED",
+        status: requiresDeposit ? "HELD" : "BOOKED",
+        holdExpiresAt: requiresDeposit ? new Date(Date.now() + HOLD_MINUTES * 60_000) : null,
+        ...(requiresDeposit
+          ? { deposit: { create: { amountNaira: depositAmountNaira, status: "PENDING" } } }
+          : {}),
       },
     });
-    return NextResponse.json({ ok: true, appointmentId: appointment.id });
+    return NextResponse.json({
+      ok: true,
+      appointmentId: appointment.id,
+      requiresDeposit,
+      depositAmountNaira: requiresDeposit ? depositAmountNaira : undefined,
+    });
   } catch (error) {
     if (isSlotConflictError(error)) {
       return NextResponse.json({ ok: false, error: SLOT_TAKEN }, { status: 409 });
