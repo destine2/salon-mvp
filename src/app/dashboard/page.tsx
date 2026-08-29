@@ -51,6 +51,7 @@ export default async function DashboardPage() {
     { href: "/dashboard/staff", label: "Staff & commission", desc: "Payouts, roles, commission rules" },
     { href: "/dashboard/hours", label: "Opening hours", desc: "Per-weekday open/close times" },
     { href: "/dashboard/settings", label: "Settings", desc: "Deposits and booking policy" },
+    { href: "/dashboard/billing", label: "Billing", desc: "Subscription and trial status" },
     { href: "/dashboard/reports", label: "Daily reconciliation", desc: "Booked vs. collected, flagged payments" },
     { href: "/dashboard/earnings", label: "My earnings", desc: "Your own running total" },
   ];

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { createHmac, timingSafeEqual } from "crypto";
 
 // Thin wrapper around the Paystack REST API — covers the two calls the
 // payment-integrity + commission-engine flow needs (PRD sections 5.2, 5.3, 8.1).
@@ -119,4 +120,66 @@ export async function initializeTransaction(params: {
 export async function verifyTransaction(reference: string) {
   const { data } = await paystack.get(`/transaction/verify/${reference}`);
   return data;
+}
+
+/**
+ * One-off, run manually via a script during setup, not called from any
+ * route — creates the real Paystack Plan for the subscription price. The
+ * resulting plan_code goes in PAYSTACK_PLAN_CODE; nothing in the app
+ * creates a Plan on the fly, same "verify externally, don't assume"
+ * approach as every other Paystack integration here.
+ */
+export async function createPlan(params: { name: string; amountKobo: number; interval: "monthly" }) {
+  const { data } = await paystack.post("/plan", {
+    name: params.name,
+    amount: params.amountKobo,
+    interval: params.interval,
+  });
+  return data; // data.data.plan_code -> PAYSTACK_PLAN_CODE
+}
+
+/**
+ * Initialize a subscription charge — src/app/api/billing/subscribe. Passing
+ * `plan` to /transaction/initialize creates the Paystack subscription
+ * automatically once this first charge succeeds (no separate /subscription
+ * call needed for the common case); every renewal after that is Paystack
+ * charging the same card on its own and firing charge.success /
+ * subscription.disable webhooks — see src/app/api/webhooks/paystack.
+ */
+export async function initializeSubscriptionTransaction(params: {
+  email: string;
+  amountKobo: number;
+  plan: string;
+  reference: string;
+  callbackUrl?: string;
+}) {
+  const { data } = await paystack.post("/transaction/initialize", {
+    email: params.email,
+    amount: params.amountKobo,
+    plan: params.plan,
+    reference: params.reference,
+    callback_url: params.callbackUrl,
+  });
+  return data; // data.data.authorization_url -> redirect/open for the owner to pay
+}
+
+/**
+ * Verifies Paystack's x-paystack-signature header: HMAC-SHA512 of the raw
+ * request body using PAYSTACK_SECRET_KEY. node:crypto rather than a
+ * dependency, same reasoning as src/lib/password.ts and src/lib/session.ts.
+ *
+ * Takes the raw body STRING, not a parsed object — the signature is over
+ * the exact bytes Paystack sent, and re-serializing a parsed JSON object
+ * is not guaranteed to reproduce them byte-for-byte (key order, spacing).
+ * Callers must read the raw request body before parsing it as JSON.
+ */
+export function verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
+  if (!signature || !process.env.PAYSTACK_SECRET_KEY) return false;
+  const expected = createHmac("sha512", process.env.PAYSTACK_SECRET_KEY).update(rawBody).digest("hex");
+  const expectedBuf = Buffer.from(expected, "hex");
+  const signatureBuf = Buffer.from(signature, "hex");
+  // timingSafeEqual throws on length mismatch rather than returning false,
+  // so a malformed signature has to be rejected before the call.
+  if (expectedBuf.length !== signatureBuf.length) return false;
+  return timingSafeEqual(expectedBuf, signatureBuf);
 }

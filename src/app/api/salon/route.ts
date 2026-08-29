@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { requireOwnerSession } from "@/lib/require-owner";
+import { isEntitled } from "@/lib/billing";
 
 export async function GET() {
   const session = getSession();
@@ -20,6 +21,16 @@ export async function PATCH(req: NextRequest) {
   const { depositPercent } = await req.json();
   if (depositPercent == null || !Number.isInteger(depositPercent) || depositPercent < 0 || depositPercent > 100) {
     return NextResponse.json({ ok: false, error: "depositPercent must be a whole number from 0 to 100" }, { status: 400 });
+  }
+
+  if (depositPercent > 0) {
+    const current = await prisma.salon.findUnique({ where: { id: session!.salonId } });
+    if (current && !isEntitled(current)) {
+      return NextResponse.json(
+        { ok: false, error: "Deposits are a paid-plan feature — upgrade to turn them on." },
+        { status: 403 }
+      );
+    }
   }
 
   const salon = await prisma.salon.update({

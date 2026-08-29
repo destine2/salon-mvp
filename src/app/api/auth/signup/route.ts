@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/password";
 import { createSessionToken } from "@/lib/session";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { CommissionType, StaffRole } from "@prisma/client";
+import { TRIAL_DAYS } from "@/lib/billing";
 
 // Public, unauthenticated — creates a brand-new salon and its owner
 // account, then logs them straight in. Previously the only way a salon
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   try {
     owner = await prisma.$transaction(async (tx) => {
       const salon = await tx.salon.create({
-        data: { name: salonName, city: city || null },
+        data: { name: salonName, city: city || null, trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60_000) },
       });
       const staff = await tx.staff.create({
         data: {

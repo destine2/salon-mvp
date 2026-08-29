@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { requireOwnerSession } from "@/lib/require-owner";
 import { hashPassword } from "@/lib/password";
 import { StaffRole, CommissionType } from "@prisma/client";
+import { isEntitled, FREE_TIER_STAFF_LIMIT } from "@/lib/billing";
 
 export async function GET(req: NextRequest) {
   const session = getSession();
@@ -40,6 +41,17 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.staff.findUnique({ where: { phone } });
   if (existing) {
     return NextResponse.json({ ok: false, error: "That phone number is already registered" }, { status: 409 });
+  }
+
+  const salon = await prisma.salon.findUnique({ where: { id: session!.salonId } });
+  if (salon && !isEntitled(salon)) {
+    const activeCount = await prisma.staff.count({ where: { salonId: session!.salonId, active: true } });
+    if (activeCount >= FREE_TIER_STAFF_LIMIT) {
+      return NextResponse.json(
+        { ok: false, error: `Free plan is limited to ${FREE_TIER_STAFF_LIMIT} staff members — upgrade to add more.` },
+        { status: 403 }
+      );
+    }
   }
 
   const resolvedRole = (role as StaffRole) ?? StaffRole.STYLIST;

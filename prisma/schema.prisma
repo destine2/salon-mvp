@@ -31,6 +31,20 @@ model Salon {
   // behavior: book straight to BOOKED, pay at checkout). Salon-level only,
   // not per-service — see the plan's "deposit defaults" wording.
   depositPercent Int @default(0)
+
+  // Subscription billing — see src/lib/billing.ts#isEntitled, the single
+  // source of truth for whether this salon currently has full access.
+  // trialEndsAt is set once at signup and never renewed; tier flips to PAID
+  // only via a real webhook-confirmed charge (src/app/api/webhooks/paystack).
+  trialEndsAt              DateTime?
+  paystackSubscriptionCode String?
+  paystackCustomerCode     String?
+  subscriptionRenewsAt     DateTime?
+  // Dedupes retried charge.success webhook deliveries for the *current*
+  // period — Paystack retries webhooks, and re-applying the same payment
+  // reference must be a no-op, not a second period extension.
+  lastSubscriptionPaymentRef String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -47,6 +61,13 @@ model Salon {
 
 enum SalonTier {
   FREE
+  // The one real paid tier for now — ₦15,000/month, see
+  // src/lib/billing.ts. STARTER/GROWTH/MULTI_BRANCH below are deliberate,
+  // documented placeholders: nothing in the app gates on them yet, since
+  // there's no product-defined difference between them (MULTI_BRANCH
+  // especially — multi-branch support itself isn't built, see the note on
+  // this model above).
+  PAID
   STARTER
   GROWTH
   MULTI_BRANCH
