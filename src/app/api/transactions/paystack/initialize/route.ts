@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { initializeSplitTransaction } from "@/lib/paystack";
 import { calculateSplit } from "@/lib/commission";
+import { withTenant } from "@/lib/tenant";
 
 export async function POST(req: NextRequest) {
   const session = getSession();
@@ -13,10 +13,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "appointmentId is required" }, { status: 400 });
   }
 
-  const appointment = await prisma.appointment.findUnique({
-    where: { id: appointmentId },
-    include: { service: true, staff: { include: { commissionRule: true } }, customer: true, transaction: true, deposit: true },
-  });
+  const appointment = await withTenant(session.salonId, (tx) =>
+    tx.appointment.findUnique({
+      where: { id: appointmentId },
+      include: { service: true, staff: { include: { commissionRule: true } }, customer: true, transaction: true, deposit: true },
+    })
+  );
   if (!appointment || appointment.salonId !== session.salonId) {
     return NextResponse.json({ ok: false, error: "Appointment not found" }, { status: 404 });
   }

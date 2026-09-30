@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import type { Tx } from "@/lib/tenant";
 import { ACTIVE_STATUSES, appointmentEndTime, conflictsWithAny } from "@/lib/overlap";
 
 // Slot generation lives in src/lib/day-availability.ts now. The version that
@@ -16,19 +16,29 @@ import { ACTIVE_STATUSES, appointmentEndTime, conflictsWithAny } from "@/lib/ove
  * exclusion constraint in prisma/sql/001_appointment_no_overlap.sql, which
  * makes the losing write fail. Keep this check anyway: it produces a helpful
  * 409 in the ordinary case instead of surfacing a database error.
+ *
+ * Takes the caller's own transaction client rather than importing the bare
+ * `prisma` singleton — this function is tenant-agnostic by design (no
+ * salonId anywhere in its own logic), called from both session-scoped and
+ * public routes, so it has to run inside whichever tenant context the
+ * caller already opened (see src/lib/tenant.ts#withTenant) rather than
+ * opening its own.
  */
-export async function isSlotAvailable(params: {
-  staffId: string;
-  startTime: Date;
-  durationMin: number;
-  excludeAppointmentId?: string;
-}): Promise<boolean> {
+export async function isSlotAvailable(
+  tx: Tx,
+  params: {
+    staffId: string;
+    startTime: Date;
+    durationMin: number;
+    excludeAppointmentId?: string;
+  }
+): Promise<boolean> {
   const dayStart = new Date(params.startTime);
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(dayStart);
   dayEnd.setDate(dayEnd.getDate() + 1);
 
-  const candidates = await prisma.appointment.findMany({
+  const candidates = await tx.appointment.findMany({
     where: {
       staffId: params.staffId,
       startTime: { gte: dayStart, lt: dayEnd },

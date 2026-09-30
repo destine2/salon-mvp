@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { initializeTransaction } from "@/lib/paystack";
+import { findSalonIdByAppointmentId, withTenant } from "@/lib/tenant";
 
 // Public, unauthenticated — initializes payment for the deposit created
 // alongside a HELD appointment (see /api/public/book). Plain, non-split
 // charge to the salon's own account; see the comment on initializeTransaction
 // in src/lib/paystack.ts for why this never goes through a staff subaccount.
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
-  const appointment = await prisma.appointment.findUnique({
-    where: { id: params.id },
-    include: { customer: true, deposit: true },
-  });
+  // No session (public flow) — resolve the salon via the escape hatch first.
+  const salonId = await findSalonIdByAppointmentId(params.id);
+  if (!salonId) {
+    return NextResponse.json({ ok: false, error: "Appointment not found" }, { status: 404 });
+  }
+
+  const appointment = await withTenant(salonId, (tx) =>
+    tx.appointment.findUnique({
+      where: { id: params.id },
+      include: { customer: true, deposit: true },
+    })
+  );
   if (!appointment) {
     return NextResponse.json({ ok: false, error: "Appointment not found" }, { status: 404 });
   }
@@ -55,10 +63,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ ok: false, error: result?.message ?? "Paystack could not start this payment." }, { status: 502 });
   }
 
-  await prisma.deposit.update({
-    where: { appointmentId: appointment.id },
-    data: { paystackRef: `deposit_${appointment.id}` },
-  });
+  await withTenant(salonId, (tx) =>
+    tx.deposit.update({
+      where: { appointmentId: appointment.id },
+      data: { paystackRef: `deposit_${appointment.id}` },
+    })
+  );
 
   return NextResponse.json({ ok: true, authorizationUrl: result.data.authorization_url });
 }

@@ -40,7 +40,11 @@ const RUN = process.env.RUN_CONCURRENCY_TEST === "1";
 
 test("exactly one concurrent booking wins the race for an identical slot", { skip: !RUN }, async () => {
   const { PrismaClient } = await import("@prisma/client");
-  const prisma = new PrismaClient();
+  // Connects as the unrestricted postgres role (MIGRATION_DATABASE_URL), not
+  // the RLS-restricted app_runtime role DATABASE_URL now points at — this
+  // test is proving the exclusion constraint, an orthogonal concern to RLS,
+  // and needs to create/read data with no tenant context open.
+  const prisma = new PrismaClient({ datasources: { db: { url: process.env.MIGRATION_DATABASE_URL } } });
   const N = 8;
 
   const salon = await prisma.salon.create({ data: { name: "Concurrency Test Salon" } });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { verifyWebhookSignature } from "@/lib/paystack";
+import { findSalonIdBySubscriptionCode, withTenant } from "@/lib/tenant";
 
 /**
  * Public — Paystack calls this directly, there's no session. Authenticated
@@ -34,13 +34,15 @@ export async function POST(req: NextRequest) {
     case "subscription.create": {
       const salonId = salonIdFromReference(event.data?.reference);
       if (!salonId) break;
-      await prisma.salon.updateMany({
-        where: { id: salonId },
-        data: {
-          paystackSubscriptionCode: event.data.subscription_code,
-          paystackCustomerCode: event.data.customer?.customer_code,
-        },
-      });
+      await withTenant(salonId, (tx) =>
+        tx.salon.updateMany({
+          where: { id: salonId },
+          data: {
+            paystackSubscriptionCode: event.data.subscription_code,
+            paystackCustomerCode: event.data.customer?.customer_code,
+          },
+        })
+      );
       break;
     }
 
@@ -52,23 +54,25 @@ export async function POST(req: NextRequest) {
       const salonId = salonIdFromReference(event.data?.reference);
       if (!salonId) break;
 
-      const salon = await prisma.salon.findUnique({ where: { id: salonId } });
-      if (!salon) break;
-      // Idempotent: Paystack retries webhook delivery, so a repeat of the
-      // same reference (the current period's payment) must be a no-op, not
-      // a second period extension — same principle as the plan's original
-      // "unique constraint on the provider reference" rule.
-      if (salon.lastSubscriptionPaymentRef === event.data.reference) break;
+      await withTenant(salonId, async (tx) => {
+        const salon = await tx.salon.findUnique({ where: { id: salonId } });
+        if (!salon) return;
+        // Idempotent: Paystack retries webhook delivery, so a repeat of the
+        // same reference (the current period's payment) must be a no-op, not
+        // a second period extension — same principle as the plan's original
+        // "unique constraint on the provider reference" rule.
+        if (salon.lastSubscriptionPaymentRef === event.data.reference) return;
 
-      const interval: string | undefined = event.data.plan?.interval;
-      const periodDays = interval === "annually" ? 365 : 30; // this app only creates monthly plans; annually kept for completeness
-      await prisma.salon.update({
-        where: { id: salonId },
-        data: {
-          tier: "PAID",
-          subscriptionRenewsAt: new Date(Date.now() + periodDays * 24 * 60 * 60_000),
-          lastSubscriptionPaymentRef: event.data.reference,
-        },
+        const interval: string | undefined = event.data.plan?.interval;
+        const periodDays = interval === "annually" ? 365 : 30; // this app only creates monthly plans; annually kept for completeness
+        await tx.salon.update({
+          where: { id: salonId },
+          data: {
+            tier: "PAID",
+            subscriptionRenewsAt: new Date(Date.now() + periodDays * 24 * 60 * 60_000),
+            lastSubscriptionPaymentRef: event.data.reference,
+          },
+        });
       });
       break;
     }
@@ -76,10 +80,16 @@ export async function POST(req: NextRequest) {
     case "subscription.disable": {
       const subscriptionCode = event.data?.subscription_code;
       if (!subscriptionCode) break;
-      await prisma.salon.updateMany({
-        where: { paystackSubscriptionCode: subscriptionCode },
-        data: { tier: "FREE" },
-      });
+      // No salon reference in this event at all — resolve it via the
+      // escape hatch before any tenant-scoped query can run.
+      const salonId = await findSalonIdBySubscriptionCode(subscriptionCode);
+      if (!salonId) break;
+      await withTenant(salonId, (tx) =>
+        tx.salon.updateMany({
+          where: { paystackSubscriptionCode: subscriptionCode },
+          data: { tier: "FREE" },
+        })
+      );
       break;
     }
 

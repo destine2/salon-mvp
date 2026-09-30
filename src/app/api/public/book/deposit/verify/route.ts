@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { verifyTransaction } from "@/lib/paystack";
+import { findSalonIdByAppointmentId, withTenant } from "@/lib/tenant";
 
 // Public, unauthenticated — where the customer's browser lands after paying
 // a deposit (called from /book/deposit-callback). Never trusts the redirect
@@ -13,10 +13,17 @@ export async function GET(req: NextRequest) {
   }
   const appointmentId = reference.slice("deposit_".length);
 
-  const appointment = await prisma.appointment.findUnique({
-    where: { id: appointmentId },
-    include: { deposit: true },
-  });
+  const salonId = await findSalonIdByAppointmentId(appointmentId);
+  if (!salonId) {
+    return NextResponse.json({ ok: false, error: "Booking not found for this reference" }, { status: 404 });
+  }
+
+  const appointment = await withTenant(salonId, (tx) =>
+    tx.appointment.findUnique({
+      where: { id: appointmentId },
+      include: { deposit: true },
+    })
+  );
   if (!appointment || !appointment.deposit) {
     return NextResponse.json({ ok: false, error: "Booking not found for this reference" }, { status: 404 });
   }
@@ -42,13 +49,13 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  await prisma.$transaction([
-    prisma.deposit.update({ where: { appointmentId: appointment.id }, data: { status: "PAID" } }),
-    prisma.appointment.update({
+  await withTenant(salonId, async (tx) => {
+    await tx.deposit.update({ where: { appointmentId: appointment.id }, data: { status: "PAID" } });
+    await tx.appointment.update({
       where: { id: appointment.id },
       data: { status: "BOOKED", holdExpiresAt: null },
-    }),
-  ]);
+    });
+  });
 
   return NextResponse.json({ ok: true });
 }

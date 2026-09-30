@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { requireOwnerSession } from "@/lib/require-owner";
 import { hashPassword } from "@/lib/password";
 import { StaffRole, CommissionType } from "@prisma/client";
 import { isEntitled, FREE_TIER_STAFF_LIMIT } from "@/lib/billing";
+import { withTenant, findStaffByPhone } from "@/lib/tenant";
 
 export async function GET(req: NextRequest) {
   const session = getSession();
@@ -15,11 +15,13 @@ export async function GET(req: NextRequest) {
   // actually be booked (calendar dropdowns) pass ?active=true to filter.
   const activeOnly = req.nextUrl.searchParams.get("active") === "true";
 
-  const staff = await prisma.staff.findMany({
-    where: { salonId: session.salonId, ...(activeOnly ? { active: true } : {}) },
-    include: { commissionRule: true },
-    orderBy: { name: "asc" },
-  });
+  const staff = await withTenant(session.salonId, (tx) =>
+    tx.staff.findMany({
+      where: { salonId: session.salonId, ...(activeOnly ? { active: true } : {}) },
+      include: { commissionRule: true },
+      orderBy: { name: "asc" },
+    })
+  );
   return NextResponse.json({ ok: true, staff });
 }
 
@@ -38,41 +40,49 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Password must be at least 8 characters." }, { status: 400 });
   }
 
-  const existing = await prisma.staff.findUnique({ where: { phone } });
+  // Staff.phone is globally unique, not per-salon — genuinely cross-tenant,
+  // hence the escape-hatch lookup rather than a tenant-scoped query.
+  const existing = await findStaffByPhone(phone);
   if (existing) {
     return NextResponse.json({ ok: false, error: "That phone number is already registered" }, { status: 409 });
   }
 
-  const salon = await prisma.salon.findUnique({ where: { id: session!.salonId } });
-  if (salon && !isEntitled(salon)) {
-    const activeCount = await prisma.staff.count({ where: { salonId: session!.salonId, active: true } });
-    if (activeCount >= FREE_TIER_STAFF_LIMIT) {
-      return NextResponse.json(
-        { ok: false, error: `Free plan is limited to ${FREE_TIER_STAFF_LIMIT} staff members — upgrade to add more.` },
-        { status: 403 }
-      );
-    }
-  }
-
   const resolvedRole = (role as StaffRole) ?? StaffRole.STYLIST;
 
-  const staff = await prisma.staff.create({
-    data: {
-      salonId: session!.salonId,
-      name,
-      phone,
-      passwordHash: hashPassword(password),
-      role: resolvedRole,
-      commissionRule: {
-        create: {
-          type: commissionType as CommissionType,
-          value: commissionValue,
-          isApprenticeStipend: resolvedRole === StaffRole.APPRENTICE,
+  const result = await withTenant(session!.salonId, async (tx) => {
+    const salon = await tx.salon.findUnique({ where: { id: session!.salonId } });
+    if (salon && !isEntitled(salon)) {
+      const activeCount = await tx.staff.count({ where: { salonId: session!.salonId, active: true } });
+      if (activeCount >= FREE_TIER_STAFF_LIMIT) {
+        return "over-limit" as const;
+      }
+    }
+
+    return tx.staff.create({
+      data: {
+        salonId: session!.salonId,
+        name,
+        phone,
+        passwordHash: hashPassword(password),
+        role: resolvedRole,
+        commissionRule: {
+          create: {
+            type: commissionType as CommissionType,
+            value: commissionValue,
+            isApprenticeStipend: resolvedRole === StaffRole.APPRENTICE,
+          },
         },
       },
-    },
-    include: { commissionRule: true },
+      include: { commissionRule: true },
+    });
   });
 
-  return NextResponse.json({ ok: true, staff });
+  if (result === "over-limit") {
+    return NextResponse.json(
+      { ok: false, error: `Free plan is limited to ${FREE_TIER_STAFF_LIMIT} staff members — upgrade to add more.` },
+      { status: 403 }
+    );
+  }
+
+  return NextResponse.json({ ok: true, staff: result });
 }

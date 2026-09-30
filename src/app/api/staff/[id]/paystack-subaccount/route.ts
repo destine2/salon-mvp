@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { requireOwnerSession } from "@/lib/require-owner";
 import { createStaffSubaccount } from "@/lib/paystack";
+import { withTenant } from "@/lib/tenant";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const { session, error } = requireOwnerSession();
   if (error) return error;
 
-  const staff = await prisma.staff.findUnique({ where: { id: params.id }, include: { commissionRule: true } });
+  const staff = await withTenant(session!.salonId, (tx) =>
+    tx.staff.findUnique({ where: { id: params.id }, include: { commissionRule: true } })
+  );
   if (!staff || staff.salonId !== session!.salonId) {
     return NextResponse.json({ ok: false, error: "Staff member not found" }, { status: 404 });
   }
@@ -30,6 +32,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const rule = staff.commissionRule;
   const ownerPercentage = rule && rule.type === "PERCENT" ? 100 - Number(rule.value) : 50;
 
+  // Deliberately outside any DB transaction — a slow external call
+  // (Paystack) has no business holding a pooled connection open while it
+  // waits on the network.
   const result = await createStaffSubaccount({
     businessName,
     bankCode,
@@ -41,10 +46,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ ok: false, error: result?.message ?? "Paystack could not create this subaccount." }, { status: 502 });
   }
 
-  const updated = await prisma.staff.update({
-    where: { id: params.id },
-    data: { paystackSubaccountCode: result.data.subaccount_code },
-  });
+  const updated = await withTenant(session!.salonId, (tx) =>
+    tx.staff.update({ where: { id: params.id }, data: { paystackSubaccountCode: result.data.subaccount_code } })
+  );
 
   return NextResponse.json({ ok: true, staff: updated });
 }

@@ -75,7 +75,7 @@ export default function PublicBookingPage() {
     if (!serviceId || !staffId || !date) return;
     setSlotsLoading(true);
     setSelectedSlot(null);
-    fetch(`/api/public/availability?staffId=${staffId}&serviceId=${serviceId}&date=${date}`)
+    fetch(`/api/public/availability?salonId=${salonId}&staffId=${staffId}&serviceId=${serviceId}&date=${date}`)
       .then((r) => r.json())
       .then((data) => {
         if (!data.ok) throw new Error(data.error ?? "Could not load available times");

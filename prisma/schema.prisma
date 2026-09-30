@@ -15,7 +15,13 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // The running app's connection — the restricted app_runtime role once
+  // the RLS refactor lands (see prisma/migrations/20260921063143_row_level_security).
   url      = env("DATABASE_URL")
+  // Unrestricted postgres role, used only by `prisma migrate deploy` and
+  // `npm run db:constraints` — migrations need to create roles/policies the
+  // restricted role could never grant itself.
+  directUrl = env("MIGRATION_DATABASE_URL")
 }
 
 // ---------------------------------------------------------------------------

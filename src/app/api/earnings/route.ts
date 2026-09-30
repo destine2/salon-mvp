@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { withTenant } from "@/lib/tenant";
 
 // A staff member's own running total — reduces the commission disputes the
 // market research flagged (PRD 5.3): "As staff, I can see my own running
@@ -15,19 +15,21 @@ export async function GET() {
   const weekStart = new Date(now);
   weekStart.setDate(weekStart.getDate() - 7);
 
-  const splits = await prisma.transactionSplit.findMany({
-    where: {
-      staffId: session.staffId,
-      recipient: "STAFF",
-      transaction: { createdAt: { gte: weekStart } },
-    },
-    include: {
-      transaction: {
-        include: { appointment: { include: { service: true, customer: true } } },
+  const splits = await withTenant(session.salonId, (tx) =>
+    tx.transactionSplit.findMany({
+      where: {
+        staffId: session.staffId,
+        recipient: "STAFF",
+        transaction: { createdAt: { gte: weekStart } },
       },
-    },
-    orderBy: { id: "desc" },
-  });
+      include: {
+        transaction: {
+          include: { appointment: { include: { service: true, customer: true } } },
+        },
+      },
+      orderBy: { id: "desc" },
+    })
+  );
 
   let todayTotal = 0;
   let weekTotal = 0;

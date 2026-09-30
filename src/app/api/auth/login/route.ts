@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { createSessionToken } from "@/lib/session";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { findStaffByPhone } from "@/lib/tenant";
 
 // Phone + password. Termii OTP-SMS used to sit here, but Termii is a paid
 // API and its sender ID is still pending approval — that made SMS the one
@@ -15,9 +15,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "phone and password are required" }, { status: 400 });
   }
 
-  // Overrides the global omit in lib/prisma.ts — this is the one place
-  // that legitimately needs the real hash to check it.
-  const staff = await prisma.staff.findUnique({ where: { phone }, omit: { passwordHash: false } });
+  // find_staff_by_phone (see src/lib/tenant.ts) always returns the real
+  // hash — this is the one place that legitimately needs it to check it.
+  const staff = await findStaffByPhone(phone);
   // Same error for "no such phone" and "wrong password" — a login form
   // shouldn't confirm which phone numbers are registered.
   const invalid = () => NextResponse.json({ ok: false, error: "Incorrect phone number or password." }, { status: 401 });

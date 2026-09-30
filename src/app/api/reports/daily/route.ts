@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { findIntegrityAnomalies, findUnaccounted } from "@/lib/reconciliation";
+import { withTenant } from "@/lib/tenant";
 
 // The daily reconciliation summary from PRD 5.2: total booked vs.
 // collected, by method, with flagged (under-collected) entries surfaced.
@@ -16,10 +16,12 @@ export async function GET(req: NextRequest) {
   const dayEnd = new Date(dayStart);
   dayEnd.setDate(dayEnd.getDate() + 1);
 
-  const appointments = await prisma.appointment.findMany({
-    where: { salonId: session.salonId, startTime: { gte: dayStart, lt: dayEnd } },
-    include: { service: true, staff: true, customer: true, transaction: true },
-  });
+  const appointments = await withTenant(session.salonId, (tx) =>
+    tx.appointment.findMany({
+      where: { salonId: session.salonId, startTime: { gte: dayStart, lt: dayEnd } },
+      include: { service: true, staff: true, customer: true, transaction: true },
+    })
+  );
 
   const completed = appointments.filter((a) => a.status === "COMPLETED" && a.transaction);
   const noShowCount = appointments.filter((a) => a.status === "NO_SHOW").length;

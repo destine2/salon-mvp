@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { requireOwnerSession } from "@/lib/require-owner";
 import { formatClock, parseClock } from "@/lib/lagos-time";
+import { withTenant } from "@/lib/tenant";
 
 // Opening hours are salon-wide (PRD keeps per-staff schedules out of MVP).
 // All times are Lagos wall clock — see src/lib/lagos-time.ts.
@@ -11,10 +11,9 @@ export async function GET() {
   const session = getSession();
   if (!session) return NextResponse.json({ ok: false, error: "Not logged in" }, { status: 401 });
 
-  const hours = await prisma.businessHours.findMany({
-    where: { salonId: session.salonId },
-    orderBy: { weekday: "asc" },
-  });
+  const hours = await withTenant(session.salonId, (tx) =>
+    tx.businessHours.findMany({ where: { salonId: session.salonId }, orderBy: { weekday: "asc" } })
+  );
 
   return NextResponse.json({
     ok: true,
@@ -96,12 +95,10 @@ export async function PUT(req: NextRequest) {
 
   // One transaction so a failure cannot leave the salon with no hours at all,
   // which would read as "closed every day" to the booking page.
-  await prisma.$transaction([
-    prisma.businessHours.deleteMany({ where: { salonId: session.salonId } }),
-    prisma.businessHours.createMany({
-      data: parsed.map((p) => ({ ...p, salonId: session.salonId })),
-    }),
-  ]);
+  await withTenant(session.salonId, async (tx) => {
+    await tx.businessHours.deleteMany({ where: { salonId: session.salonId } });
+    await tx.businessHours.createMany({ data: parsed.map((p) => ({ ...p, salonId: session.salonId })) });
+  });
 
   return NextResponse.json({ ok: true, count: parsed.length });
 }

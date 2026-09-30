@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { availableSlots } from "@/lib/day-availability";
 import { ACTIVE_STATUSES } from "@/lib/overlap";
 import { instantToLagosDate, lagosToInstant, parseDateOnly } from "@/lib/lagos-time";
+import { withTenant } from "@/lib/tenant";
 
 // Public — computes open slots for a given staff/service/day so the
 // customer-facing booking page only ever shows times that are actually free.
@@ -17,13 +17,14 @@ import { instantToLagosDate, lagosToInstant, parseDateOnly } from "@/lib/lagos-t
 //    Correct on a Lagos laptop, an hour out on Vercel's UTC servers. Slot times
 //    are now resolved explicitly through lib/lagos-time.
 export async function GET(req: NextRequest) {
+  const salonId = req.nextUrl.searchParams.get("salonId");
   const staffId = req.nextUrl.searchParams.get("staffId");
   const serviceId = req.nextUrl.searchParams.get("serviceId");
   const dateParam = req.nextUrl.searchParams.get("date");
 
-  if (!staffId || !serviceId || !dateParam) {
+  if (!salonId || !staffId || !serviceId || !dateParam) {
     return NextResponse.json(
-      { ok: false, error: "staffId, serviceId, and date are required" },
+      { ok: false, error: "salonId, staffId, serviceId, and date are required" },
       { status: 400 }
     );
   }
@@ -41,38 +42,50 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const service = await prisma.service.findUnique({ where: { id: serviceId } });
-  if (!service) {
-    return NextResponse.json({ ok: false, error: "Service not found" }, { status: 404 });
-  }
+  const result = await withTenant(salonId, async (tx) => {
+    const service = await tx.service.findUnique({ where: { id: serviceId } });
+    if (!service || service.salonId !== salonId) {
+      return "service-not-found" as const;
+    }
 
-  // The booking page only ever offers active staff, so this only fires
-  // against a stale page or a direct API call — but it's the actual
-  // enforcement point, same as the check in /api/public/book.
-  const staff = await prisma.staff.findUnique({ where: { id: staffId } });
-  if (!staff || staff.salonId !== service.salonId) {
-    return NextResponse.json({ ok: false, error: "Staff member not found" }, { status: 404 });
-  }
-  if (!staff.active) {
+    // The booking page only ever offers active staff, so this only fires
+    // against a stale page or a direct API call — but it's the actual
+    // enforcement point, same as the check in /api/public/book.
+    const staff = await tx.staff.findUnique({ where: { id: staffId } });
+    if (!staff || staff.salonId !== service.salonId) {
+      return "staff-not-found" as const;
+    }
+    if (!staff.active) {
+      return "staff-inactive" as const;
+    }
+
+    // The Lagos day maps to a UTC window that starts the previous evening, so
+    // bound the query by real instants rather than by calendar date.
+    const dayStart = lagosToInstant(date, 0);
+    const dayEnd = lagosToInstant(date, 24 * 60);
+
+    const [hours, appointments] = await Promise.all([
+      tx.businessHours.findMany({ where: { salonId: service.salonId } }),
+      tx.appointment.findMany({
+        where: {
+          staffId,
+          status: { in: [...ACTIVE_STATUSES] },
+          startTime: { gte: dayStart, lt: dayEnd },
+        },
+        select: { startTime: true, endTime: true },
+      }),
+    ]);
+
+    return { service, hours, appointments };
+  });
+
+  if (result === "service-not-found") return NextResponse.json({ ok: false, error: "Service not found" }, { status: 404 });
+  if (result === "staff-not-found") return NextResponse.json({ ok: false, error: "Staff member not found" }, { status: 404 });
+  if (result === "staff-inactive") {
     return NextResponse.json({ ok: false, error: "This staff member is no longer taking bookings." }, { status: 409 });
   }
 
-  // The Lagos day maps to a UTC window that starts the previous evening, so
-  // bound the query by real instants rather than by calendar date.
-  const dayStart = lagosToInstant(date, 0);
-  const dayEnd = lagosToInstant(date, 24 * 60);
-
-  const [hours, appointments] = await Promise.all([
-    prisma.businessHours.findMany({ where: { salonId: service.salonId } }),
-    prisma.appointment.findMany({
-      where: {
-        staffId,
-        status: { in: [...ACTIVE_STATUSES] },
-        startTime: { gte: dayStart, lt: dayEnd },
-      },
-      select: { startTime: true, endTime: true },
-    }),
-  ]);
+  const { service, hours, appointments } = result;
 
   const slots = availableSlots({
     date,

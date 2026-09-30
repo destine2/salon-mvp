@@ -1,7 +1,11 @@
 import { PrismaClient, StaffRole, CommissionType } from "@prisma/client";
 import { hashPassword } from "../src/lib/password";
 
-const prisma = new PrismaClient();
+// Dev-only trusted script — connects as the unrestricted postgres role
+// (MIGRATION_DATABASE_URL) rather than the RLS-restricted app_runtime role
+// DATABASE_URL now points the running app at, since seeding legitimately
+// creates data with no tenant context open yet.
+const prisma = new PrismaClient({ datasources: { db: { url: process.env.MIGRATION_DATABASE_URL } } });
 
 async function main() {
   const salon = await prisma.salon.upsert({

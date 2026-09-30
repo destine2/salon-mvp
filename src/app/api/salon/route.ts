@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { requireOwnerSession } from "@/lib/require-owner";
 import { isEntitled } from "@/lib/billing";
+import { withTenant } from "@/lib/tenant";
 
 export async function GET() {
   const session = getSession();
   if (!session) return NextResponse.json({ ok: false, error: "Not logged in" }, { status: 401 });
 
-  const salon = await prisma.salon.findUnique({ where: { id: session.salonId } });
+  const salon = await withTenant(session.salonId, (tx) => tx.salon.findUnique({ where: { id: session.salonId } }));
   if (!salon) return NextResponse.json({ ok: false, error: "Salon not found" }, { status: 404 });
 
   return NextResponse.json({ ok: true, salon });
@@ -23,20 +23,19 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "depositPercent must be a whole number from 0 to 100" }, { status: 400 });
   }
 
-  if (depositPercent > 0) {
-    const current = await prisma.salon.findUnique({ where: { id: session!.salonId } });
-    if (current && !isEntitled(current)) {
-      return NextResponse.json(
-        { ok: false, error: "Deposits are a paid-plan feature — upgrade to turn them on." },
-        { status: 403 }
-      );
+  const salon = await withTenant(session!.salonId, async (tx) => {
+    if (depositPercent > 0) {
+      const current = await tx.salon.findUnique({ where: { id: session!.salonId } });
+      if (current && !isEntitled(current)) {
+        return "not-entitled" as const;
+      }
     }
-  }
-
-  const salon = await prisma.salon.update({
-    where: { id: session!.salonId },
-    data: { depositPercent },
+    return tx.salon.update({ where: { id: session!.salonId }, data: { depositPercent } });
   });
+
+  if (salon === "not-entitled") {
+    return NextResponse.json({ ok: false, error: "Deposits are a paid-plan feature — upgrade to turn them on." }, { status: 403 });
+  }
 
   return NextResponse.json({ ok: true, salon });
 }

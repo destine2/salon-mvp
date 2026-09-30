@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { verifyTransaction } from "@/lib/paystack";
 import { calculateSplit } from "@/lib/commission";
+import { findSalonIdByAppointmentId, withTenant } from "@/lib/tenant";
 
 // Called from the /checkout/paystack-callback page once Paystack redirects
 // back. This is the "confirm a transaction actually settled before marking
@@ -12,11 +12,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "reference is required" }, { status: 400 });
   }
 
-  // Our reference IS the appointmentId (see paystack/initialize).
-  const appointment = await prisma.appointment.findUnique({
-    where: { id: reference },
-    include: { service: true, staff: { include: { commissionRule: true } }, transaction: { include: { splits: true } }, deposit: true },
-  });
+  // Our reference IS the appointmentId (see paystack/initialize). No session
+  // here (Paystack's redirect, not an owner request), so the salon has to be
+  // resolved via the escape hatch before any tenant-scoped query can run.
+  const salonId = await findSalonIdByAppointmentId(reference);
+  if (!salonId) {
+    return NextResponse.json({ ok: false, error: "Appointment not found for this reference" }, { status: 404 });
+  }
+
+  const appointment = await withTenant(salonId, (tx) =>
+    tx.appointment.findUnique({
+      where: { id: reference },
+      include: { service: true, staff: { include: { commissionRule: true } }, transaction: { include: { splits: true } }, deposit: true },
+    })
+  );
   if (!appointment) {
     return NextResponse.json({ ok: false, error: "Appointment not found for this reference" }, { status: 404 });
   }
@@ -76,7 +85,7 @@ export async function GET(req: NextRequest) {
   // deliberately-manual edges (refunds, cash shortfalls).
   const split = rule ? calculateSplit(rule, amount) : { ownerShare: amount, staffShare: 0 };
 
-  const transaction = await prisma.$transaction(async (tx) => {
+  const transaction = await withTenant(salonId, async (tx) => {
     const created = await tx.transaction.create({
       data: {
         appointmentId: appointment.id,

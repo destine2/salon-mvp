@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { withTenant } from "@/lib/tenant";
 import CopyLinkButton from "./copy-link-button";
 
 // First cut of the "protected route wrapper" from the task list: any page
@@ -13,10 +13,12 @@ export default async function DashboardPage() {
   const session = getSession();
   if (!session) redirect("/login");
 
-  const staff = await prisma.staff.findUnique({
-    where: { id: session.staffId },
-    include: { salon: true },
-  });
+  const staff = await withTenant(session.salonId, (tx) =>
+    tx.staff.findUnique({
+      where: { id: session.staffId },
+      include: { salon: true },
+    })
+  );
 
   if (!staff) redirect("/login");
 
@@ -31,11 +33,13 @@ export default async function DashboardPage() {
   // wizard (out of MVP scope: owners are pre-seeded, not self-registering),
   // this just checks what's missing and points at it. Booking can't work
   // with zero services or zero non-owner staff, so call that out plainly.
-  const [serviceCount, otherStaffCount, hoursCount] = await Promise.all([
-    prisma.service.count({ where: { salonId: staff.salonId } }),
-    prisma.staff.count({ where: { salonId: staff.salonId, role: { not: "OWNER" }, active: true } }),
-    prisma.businessHours.count({ where: { salonId: staff.salonId } }),
-  ]);
+  const [serviceCount, otherStaffCount, hoursCount] = await withTenant(session.salonId, (tx) =>
+    Promise.all([
+      tx.service.count({ where: { salonId: staff.salonId } }),
+      tx.staff.count({ where: { salonId: staff.salonId, role: { not: "OWNER" }, active: true } }),
+      tx.businessHours.count({ where: { salonId: staff.salonId } }),
+    ])
+  );
   const setupSteps = [
     { done: serviceCount > 0, label: "Add at least one service", href: "/dashboard/services" },
     { done: otherStaffCount > 0, label: "Add at least one staff member", href: "/dashboard/staff" },

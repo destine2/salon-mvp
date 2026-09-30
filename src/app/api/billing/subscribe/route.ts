@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { requireOwnerSession } from "@/lib/require-owner";
 import { initializeSubscriptionTransaction } from "@/lib/paystack";
 import { SUBSCRIPTION_PRICE_NAIRA } from "@/lib/billing";
+import { withTenant } from "@/lib/tenant";
 
 // Owner-only — starts (or restarts, after a lapse) the salon's subscription.
 // Passing `plan` to Paystack's /transaction/initialize creates the actual
@@ -18,7 +18,7 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: "Billing isn't configured yet — contact support." }, { status: 500 });
   }
 
-  const owner = await prisma.staff.findUnique({ where: { id: session!.staffId } });
+  const owner = await withTenant(session!.salonId, (tx) => tx.staff.findUnique({ where: { id: session!.staffId } }));
   if (!owner) {
     return NextResponse.json({ ok: false, error: "Staff record not found" }, { status: 404 });
   }

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { createSessionToken } from "@/lib/session";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { CommissionType, StaffRole } from "@prisma/client";
 import { TRIAL_DAYS } from "@/lib/billing";
+import { createSalon, findStaffByPhone, withTenant } from "@/lib/tenant";
 
 // Public, unauthenticated — creates a brand-new salon and its owner
 // account, then logs them straight in. Previously the only way a salon
@@ -23,20 +23,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Password must be at least 8 characters." }, { status: 400 });
   }
 
-  const existing = await prisma.staff.findUnique({ where: { phone } });
+  const existing = await findStaffByPhone(phone);
   if (existing) {
     return NextResponse.json({ ok: false, error: "That phone number is already registered." }, { status: 409 });
   }
 
-  // Salon + owner + their default commission rule together, so a failure
-  // partway through (e.g. the phone race above losing to a concurrent
-  // signup) can't leave an orphaned salon with no owner.
+  // Salon first, via the create_salon() escape hatch — there's no existing
+  // tenant to open a context for yet, and (confirmed live) a permissive
+  // INSERT-only policy isn't actually enough on its own: Prisma's create()
+  // always does INSERT ... RETURNING *, and that RETURNING is governed by
+  // the SELECT-side policy, which has nothing to check against either. See
+  // src/lib/tenant.ts#createSalon. Staff and CommissionRule, in contrast,
+  // are scoped by salonId, so they need a real tenant context — which can
+  // only be opened once the salon's id exists. That means this can no
+  // longer be one atomic transaction the way it was before RLS (Prisma's
+  // transaction client can't nest $transaction calls); a failure creating
+  // the staff row (e.g. losing the phone-uniqueness race below) can now
+  // leave an orphaned salon with no owner. Same category as this app's
+  // other deliberately-flagged edges (refunds, cash shortfalls) rather than
+  // a silent regression.
+  const salon = await createSalon({
+    name: salonName,
+    city: city || null,
+    trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60_000),
+  });
+
   let owner;
   try {
-    owner = await prisma.$transaction(async (tx) => {
-      const salon = await tx.salon.create({
-        data: { name: salonName, city: city || null, trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60_000) },
-      });
+    owner = await withTenant(salon.id, async (tx) => {
       const staff = await tx.staff.create({
         data: {
           salonId: salon.id,
