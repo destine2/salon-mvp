@@ -21,7 +21,22 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json();
   const { depositPercent } = body;
-  const data: { depositPercent?: number; notifyEmail?: string | null } = {};
+  const data: { depositPercent?: number; notifyEmail?: string | null; contactPhone?: string | null; whatsappNumber?: string | null; address?: string | null } = {};
+
+  for (const [key, max, pattern] of [
+    ["contactPhone", 30, /^[+\d\s()-]+$/],
+    ["whatsappNumber", 20, /^\d+$/],
+    ["address", 200, null],
+  ] as const) {
+    const v = body[key];
+    if (v === undefined) continue;
+    const t = typeof v === "string" ? v.trim() : "";
+    if (t === "") data[key] = null;
+    else if (t.length > max || (pattern && !pattern.test(t))) {
+      const hint = key === "whatsappNumber" ? "digits only, with country code, e.g. 2348012345678" : key === "contactPhone" ? "digits, spaces, + and - only" : "too long";
+      return NextResponse.json({ ok: false, error: `Invalid ${key}: ${hint}` }, { status: 400 });
+    } else data[key] = t;
+  }
 
   if (body.notifyEmail !== undefined) {
     if (body.notifyEmail === "" || body.notifyEmail === null) data.notifyEmail = null;

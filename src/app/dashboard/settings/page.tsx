@@ -9,6 +9,10 @@ export default function SettingsPage() {
   const [emailSaving, setEmailSaving] = useState(false);
   const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [site, setSite] = useState({ contactPhone: "", whatsappNumber: "", address: "" });
+  const [siteSaving, setSiteSaving] = useState(false);
+  const [siteMessage, setSiteMessage] = useState<string | null>(null);
+  const [siteError, setSiteError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +25,7 @@ export default function SettingsPage() {
         if (!data.ok) throw new Error(data.error ?? "Could not load settings");
         setDepositPercent(String(data.salon.depositPercent));
         setNotifyEmail(data.salon.notifyEmail ?? "");
+        setSite({ contactPhone: data.salon.contactPhone ?? "", whatsappNumber: data.salon.whatsappNumber ?? "", address: data.salon.address ?? "" });
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong"))
       .finally(() => setLoading(false));
@@ -69,6 +74,27 @@ export default function SettingsPage() {
       setEmailError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setEmailSaving(false);
+    }
+  }
+
+  async function handleSaveSite(e: FormEvent) {
+    e.preventDefault();
+    setSiteError(null);
+    setSiteMessage(null);
+    setSiteSaving(true);
+    try {
+      const res = await fetch("/api/salon", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(site),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "Could not save");
+      setSiteMessage("Saved. Your website will show this within a minute.");
+    } catch (err) {
+      setSiteError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSiteSaving(false);
     }
   }
 
@@ -132,6 +158,35 @@ export default function SettingsPage() {
           </form>
           {emailError && <p className="error-text" style={{ marginTop: "var(--space-3)" }}>{emailError}</p>}
           {emailMessage && <p style={{ color: "var(--color-success)", marginTop: "var(--space-3)" }}>{emailMessage}</p>}
+        </div>
+      )}
+      {!loading && (
+        <div className="card" style={{ maxWidth: 420, marginTop: "var(--space-4)" }}>
+          <h2 style={{ marginBottom: "var(--space-1)" }}>Website details</h2>
+          <p>
+            Your website reads these live, so changes appear there without anyone rebuilding it. Prices come from{" "}
+            <Link href="/dashboard/services" style={{ textDecoration: "underline" }}>Services</Link> and opening times
+            from <Link href="/dashboard/hours" style={{ textDecoration: "underline" }}>Opening hours</Link>.
+          </p>
+          <form onSubmit={handleSaveSite}>
+            <label className="field">
+              <span className="field-label">Phone</span>
+              <input value={site.contactPhone} onChange={(e) => setSite({ ...site, contactPhone: e.target.value })} placeholder="+234 801 234 5678" className="input" />
+            </label>
+            <label className="field">
+              <span className="field-label">WhatsApp number (digits only, with country code)</span>
+              <input value={site.whatsappNumber} onChange={(e) => setSite({ ...site, whatsappNumber: e.target.value })} placeholder="2348012345678" className="input" />
+            </label>
+            <label className="field">
+              <span className="field-label">Address</span>
+              <input value={site.address} onChange={(e) => setSite({ ...site, address: e.target.value })} placeholder="14 Admiralty Way, Lekki Phase 1, Lagos" className="input" />
+            </label>
+            <button type="submit" disabled={siteSaving} className="btn btn-primary">
+              {siteSaving ? "Saving…" : "Save"}
+            </button>
+          </form>
+          {siteError && <p className="error-text" style={{ marginTop: "var(--space-3)" }}>{siteError}</p>}
+          {siteMessage && <p style={{ color: "var(--color-success)", marginTop: "var(--space-3)" }}>{siteMessage}</p>}
         </div>
       )}
     </main>

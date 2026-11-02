@@ -39,6 +39,10 @@ model Salon {
   depositPercent Int @default(0)
   // Where new-booking alert emails go (the salon owner / front desk).
   notifyEmail String?
+  // Shown on the salon's public website, which reads them live.
+  contactPhone   String?
+  whatsappNumber String?
+  address        String?
 
   // Subscription billing — see src/lib/billing.ts#isEntitled, the single
   // source of truth for whether this salon currently has full access.
