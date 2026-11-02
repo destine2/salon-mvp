@@ -3,6 +3,11 @@ import { prisma } from "./prisma";
 
 export type Tx = Prisma.TransactionClient;
 
+// Prisma's default maxWait is 2s — too short for Supabase's pooler, which
+// intermittently takes longer than that to hand out a connection (seen live
+// as P2028 "Unable to start a transaction in the given time").
+const TX_OPTIONS = { maxWait: 10_000, timeout: 15_000 };
+
 /**
  * Opens the per-request tenant context that Postgres RLS policies check
  * (see prisma/migrations/20260921063143_row_level_security). Every query
@@ -26,7 +31,7 @@ export async function withTenant<T>(salonId: string, fn: (tx: Tx) => Promise<T>)
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('app.current_salon_id', ${salonId}, true)`;
     return fn(tx);
-  });
+  }, TX_OPTIONS);
 }
 
 export type StaffByPhone = {

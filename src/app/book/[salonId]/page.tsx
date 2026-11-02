@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { DRAPING_OPTIONS, SKIN_TYPES } from "@/lib/intake";
 
 type Service = { id: string; name: string; priceNaira: string; durationMin: number };
 type StaffOption = { id: string; name: string };
@@ -47,6 +48,12 @@ export default function PublicBookingPage() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [areasOfFocus, setAreasOfFocus] = useState("");
+  const [draping, setDraping] = useState<string>("");
+  const [skinType, setSkinType] = useState<string>("");
+  const [notes, setNotes] = useState("");
+  const [email, setEmail] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // Set once /api/public/book returns requiresDeposit: true — the
@@ -100,6 +107,13 @@ export default function PublicBookingPage() {
           startTime: selectedSlot,
           customerName: name || undefined,
           customerPhone: phone,
+          customerEmail: email || undefined,
+          intake: {
+            areasOfFocus: areasOfFocus || undefined,
+            draping: draping || undefined,
+            skinType: skinType || undefined,
+            notes: notes || undefined,
+          },
         }),
       });
       const data = await res.json();
@@ -194,10 +208,10 @@ export default function PublicBookingPage() {
   return (
     <main style={page}>
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
-        <header style={{ marginBottom: "var(--space-5)" }}>
-          <p style={eyebrow}>Book your appointment</p>
-          <h1>{salon.name}</h1>
-          {salon.city && <p style={{ color: "var(--color-ink-faint)", marginBottom: 0 }}>{salon.city}</p>}
+        <header style={hero}>
+          <p style={{ ...eyebrow, color: "var(--color-gold)" }}>Book your appointment</p>
+          <h1 style={{ color: "#F1EAE0", marginBottom: 6 }}>{salon.name}</h1>
+          {salon.city && <p style={{ color: "rgba(241,234,224,0.7)", margin: 0 }}>{salon.city}</p>}
         </header>
 
         {error && <p className="error-text" style={{ marginBottom: "var(--space-3)" }}>{error}</p>}
@@ -269,35 +283,89 @@ export default function PublicBookingPage() {
         </section>
 
         {selectedSlot && (
-          <section className="card" style={{ animation: "fadeIn 0.35s ease" }}>
-            <p style={sectionLabel}>4. Your details</p>
-            <label className="field">
-              <span className="field-label">Your name</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} className="input" />
-            </label>
-            <label className="field">
-              <span className="field-label">Your phone (WhatsApp number)</span>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="2348012345678"
-                required
-                className="input"
-              />
-            </label>
-            <button onClick={handleConfirm} disabled={submitting || !phone} className="btn btn-primary" style={{ width: "100%" }}>
-              {submitting
-                ? "Booking…"
-                : salon.depositPercent > 0
-                  ? `Hold this slot — ${salon.depositPercent}% deposit required`
-                  : `Confirm — ${selectedService ? "₦" + Number(selectedService.priceNaira).toLocaleString() : ""}`}
-            </button>
-            {salon.depositPercent > 0 && (
-              <p style={{ fontSize: "0.8125rem", color: "var(--color-ink-faint)", marginTop: "var(--space-2)", marginBottom: 0 }}>
-                This salon holds your slot for 10 minutes while you pay a {salon.depositPercent}% deposit to confirm it.
-              </p>
-            )}
-          </section>
+          <div style={{ animation: "fadeIn 0.35s ease" }}>
+            <section className="card" style={{ marginBottom: "var(--space-4)" }}>
+              <p style={sectionLabel}>4. Your consultation <span style={optional}>(optional, helps us prepare)</span></p>
+
+              <p style={miniLabel}>Draping preference</p>
+              <div style={chipRow}>
+                {DRAPING_OPTIONS.map((o) => (
+                  <button key={o.value} type="button" onClick={() => setDraping(draping === o.value ? "" : o.value)} style={chip(draping === o.value)} title={o.hint}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+
+              <p style={miniLabel}>Skin type</p>
+              <div style={chipRow}>
+                {SKIN_TYPES.map((t) => (
+                  <button key={t} type="button" onClick={() => setSkinType(skinType === t ? "" : t)} style={chip(skinType === t)}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+
+              <label className="field">
+                <span className="field-label">Areas of concern or focus</span>
+                <textarea
+                  value={areasOfFocus}
+                  onChange={(e) => setAreasOfFocus(e.target.value)}
+                  maxLength={500}
+                  rows={2}
+                  placeholder="e.g. tight shoulders, scalp sensitivity"
+                  className="input"
+                  style={{ resize: "vertical" }}
+                />
+              </label>
+              <label className="field" style={{ marginBottom: 0 }}>
+                <span className="field-label">Anything else we should know (allergies, injuries)</span>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={1000} rows={2} className="input" style={{ resize: "vertical" }} />
+              </label>
+            </section>
+
+            <section className="card">
+              <p style={sectionLabel}>5. Your details</p>
+              <label className="field">
+                <span className="field-label">Your name</span>
+                <input value={name} onChange={(e) => setName(e.target.value)} className="input" />
+              </label>
+              <label className="field">
+                <span className="field-label">Your phone (WhatsApp number)</span>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="2348012345678"
+                  required
+                  className="input"
+                />
+              </label>
+              <label className="field">
+                <span className="field-label">Email <span style={optional}>(optional — for your confirmation and reminders)</span></span>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="input" />
+              </label>
+
+              <label style={consentBox}>
+                <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 3, accentColor: "var(--color-gold)" }} />
+                <span>
+                  I understand and agree to the salon&rsquo;s booking policies:
+                  <ul style={{ margin: "6px 0 0", paddingLeft: "1.1em" }}>
+                    {salon.depositPercent > 0 && (
+                      <li>A {salon.depositPercent}% deposit is required to confirm your slot; it is held for 10 minutes.</li>
+                    )}
+                    <li>Please give notice if you need to cancel or reschedule so the slot can be offered to someone else.</li>
+                  </ul>
+                </span>
+              </label>
+
+              <button onClick={handleConfirm} disabled={submitting || !phone || !agreed} className="btn btn-primary" style={{ width: "100%" }}>
+                {submitting
+                  ? "Booking…"
+                  : salon.depositPercent > 0
+                    ? `Hold this slot — ${salon.depositPercent}% deposit required`
+                    : `Confirm — ${selectedService ? "₦" + Number(selectedService.priceNaira).toLocaleString() : ""}`}
+              </button>
+            </section>
+          </div>
         )}
       </div>
     </main>
@@ -377,4 +445,53 @@ const checkCircle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
+};
+
+const hero: React.CSSProperties = {
+  marginBottom: "var(--space-5)",
+  padding: "var(--space-5) var(--space-4)",
+  borderRadius: "var(--radius-md, 14px)",
+  background: "linear-gradient(135deg, #171310 0%, #2a211a 100%)",
+  boxShadow: "var(--shadow-card)",
+};
+
+const optional: React.CSSProperties = { fontWeight: 400, color: "var(--color-ink-faint)" };
+
+const miniLabel: React.CSSProperties = {
+  fontFamily: "var(--font-body)",
+  fontSize: "0.8125rem",
+  fontWeight: 600,
+  color: "var(--color-ink)",
+  margin: "var(--space-3) 0 var(--space-1)",
+};
+
+const chipRow: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: "var(--space-1)", marginBottom: "var(--space-2)" };
+
+function chip(active: boolean): React.CSSProperties {
+  return {
+    fontFamily: "var(--font-body)",
+    fontSize: "0.8125rem",
+    fontWeight: 600,
+    padding: "0.45em 0.9em",
+    borderRadius: 999,
+    border: active ? "1.5px solid var(--color-gold)" : "1px solid var(--color-border)",
+    background: active ? "rgba(var(--color-gold-rgb), 0.12)" : "var(--color-surface)",
+    color: "var(--color-ink)",
+    cursor: "pointer",
+    transition: "all 0.25s ease",
+  };
+}
+
+const consentBox: React.CSSProperties = {
+  display: "flex",
+  gap: "var(--space-2)",
+  alignItems: "flex-start",
+  fontSize: "0.8125rem",
+  color: "var(--color-ink-soft)",
+  padding: "var(--space-2) var(--space-3)",
+  marginBottom: "var(--space-3)",
+  borderRadius: "var(--radius-sm)",
+  background: "rgba(var(--color-gold-rgb), 0.06)",
+  border: "1px solid var(--color-border)",
+  cursor: "pointer",
 };

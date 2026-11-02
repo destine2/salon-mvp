@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSlotAvailable } from "@/lib/scheduling";
 import { appointmentEndTime, isSlotConflictError } from "@/lib/overlap";
 import { withTenant } from "@/lib/tenant";
+import { parseIntake } from "@/lib/intake";
+import { isValidEmail } from "@/lib/email";
+import { sendBookingConfirmed } from "@/lib/notifications";
 
 const SLOT_TAKEN = "Sorry, that slot was just taken — please pick another time.";
 
@@ -9,7 +12,9 @@ const SLOT_TAKEN = "Sorry, that slot was just taken — please pick another time
 // booking page (PRD 7.1, steps 1-3). No session required; this is the
 // no-app-download path a customer reaches via the WhatsApp link.
 export async function POST(req: NextRequest) {
-  const { salonId, staffId, serviceId, startTime, customerName, customerPhone } = await req.json();
+  const { salonId, staffId, serviceId, startTime, customerName, customerPhone, customerEmail: rawEmail, intake: rawIntake } = await req.json();
+  const intake = parseIntake(rawIntake);
+  const customerEmail = isValidEmail(rawEmail) ? rawEmail.trim().toLowerCase() : null;
 
   if (!salonId || !staffId || !serviceId || !startTime || !customerPhone) {
     return NextResponse.json(
@@ -48,8 +53,8 @@ export async function POST(req: NextRequest) {
 
     const customer = await tx.customer.upsert({
       where: { salonId_phone: { salonId, phone: customerPhone } },
-      update: { name: customerName ?? undefined },
-      create: { salonId, phone: customerPhone, name: customerName ?? null },
+      update: { name: customerName ?? undefined, ...(customerEmail ? { email: customerEmail } : {}) },
+      create: { salonId, phone: customerPhone, name: customerName ?? null, email: customerEmail },
     });
 
     // Opt-in per salon (Salon.depositPercent, default 0) — an existing salon
@@ -74,6 +79,7 @@ export async function POST(req: NextRequest) {
           startTime: start,
           endTime: appointmentEndTime(start, service.durationMin),
           isWalkIn: false,
+          ...(intake ? { intake } : {}),
           status: requiresDeposit ? "HELD" : "BOOKED",
           holdExpiresAt: requiresDeposit ? new Date(Date.now() + HOLD_MINUTES * 60_000) : null,
           ...(requiresDeposit
@@ -97,6 +103,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "This staff member is no longer taking bookings." }, { status: 409 });
   }
   if (result === "slot-taken") return NextResponse.json({ ok: false, error: SLOT_TAKEN }, { status: 409 });
+
+  // Deposit bookings are confirmed (and announced) once the deposit is paid —
+  // see /api/public/book/deposit/verify.
+  if (!result.requiresDeposit) await sendBookingConfirmed(salonId, result.appointmentId);
 
   return NextResponse.json({
     ok: true,

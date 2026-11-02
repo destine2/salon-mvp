@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { requireOwnerSession } from "@/lib/require-owner";
 import { isEntitled } from "@/lib/billing";
 import { withTenant } from "@/lib/tenant";
+import { isValidEmail } from "@/lib/email";
 
 export async function GET() {
   const session = getSession();
@@ -18,19 +19,33 @@ export async function PATCH(req: NextRequest) {
   const { session, error } = requireOwnerSession();
   if (error) return error;
 
-  const { depositPercent } = await req.json();
-  if (depositPercent == null || !Number.isInteger(depositPercent) || depositPercent < 0 || depositPercent > 100) {
-    return NextResponse.json({ ok: false, error: "depositPercent must be a whole number from 0 to 100" }, { status: 400 });
+  const body = await req.json();
+  const { depositPercent } = body;
+  const data: { depositPercent?: number; notifyEmail?: string | null } = {};
+
+  if (body.notifyEmail !== undefined) {
+    if (body.notifyEmail === "" || body.notifyEmail === null) data.notifyEmail = null;
+    else if (isValidEmail(body.notifyEmail)) data.notifyEmail = body.notifyEmail.trim().toLowerCase();
+    else return NextResponse.json({ ok: false, error: "That doesn't look like a valid email address." }, { status: 400 });
+  }
+  if (depositPercent !== undefined) {
+    if (!Number.isInteger(depositPercent) || depositPercent < 0 || depositPercent > 100) {
+      return NextResponse.json({ ok: false, error: "depositPercent must be a whole number from 0 to 100" }, { status: 400 });
+    }
+    data.depositPercent = depositPercent;
+  }
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ ok: false, error: "Nothing to update" }, { status: 400 });
   }
 
   const salon = await withTenant(session!.salonId, async (tx) => {
-    if (depositPercent > 0) {
+    if (data.depositPercent !== undefined && data.depositPercent > 0) {
       const current = await tx.salon.findUnique({ where: { id: session!.salonId } });
       if (current && !isEntitled(current)) {
         return "not-entitled" as const;
       }
     }
-    return tx.salon.update({ where: { id: session!.salonId }, data: { depositPercent } });
+    return tx.salon.update({ where: { id: session!.salonId }, data });
   });
 
   if (salon === "not-entitled") {

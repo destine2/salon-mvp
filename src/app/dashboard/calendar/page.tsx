@@ -13,6 +13,7 @@ type Appointment = {
   customer: { name: string | null; phone: string };
   service: { name: string; priceNaira: string; durationMin: number };
   transaction: { id: string } | null;
+  intake?: { areasOfFocus?: string; draping?: string; skinType?: string; notes?: string } | null;
 };
 
 type StaffOption = { id: string; name: string; role: string };
@@ -252,6 +253,13 @@ export default function CalendarPage() {
                         <td style={td}>
                           {a.customer.name || "—"} ({a.customer.phone})
                           {a.isWalkIn ? <span className="pill pill-neutral" style={{ marginLeft: "var(--space-1)" }}>Walk-in</span> : null}
+                          {a.intake && (
+                            <div style={{ fontSize: "0.8125rem", color: "var(--color-ink-faint)", marginTop: 4 }}>
+                              {[a.intake.draping && `Draping: ${a.intake.draping}`, a.intake.skinType && `Skin: ${a.intake.skinType}`, a.intake.areasOfFocus && `Focus: ${a.intake.areasOfFocus}`, a.intake.notes && `Note: ${a.intake.notes}`]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </div>
+                          )}
                         </td>
                         <td style={td}>{a.service.name}</td>
                         <td style={td}>

@@ -37,6 +37,8 @@ model Salon {
   // behavior: book straight to BOOKED, pay at checkout). Salon-level only,
   // not per-service — see the plan's "deposit defaults" wording.
   depositPercent Int @default(0)
+  // Where new-booking alert emails go (the salon owner / front desk).
+  notifyEmail String?
 
   // Subscription billing — see src/lib/billing.ts#isEntitled, the single
   // source of truth for whether this salon currently has full access.
@@ -129,6 +131,7 @@ model Customer {
   salon     Salon    @relation(fields: [salonId], references: [id])
   name      String?
   phone     String   // WhatsApp-identified, not a created account
+  email     String?  // optional; enables email confirmations and reminders
   createdAt DateTime @default(now())
 
   appointments Appointment[]
@@ -222,8 +225,13 @@ model Appointment {
   // for why HELD still blocks the slot in the meantime.
   holdExpiresAt DateTime? @db.Timestamptz(3)
 
+  // Consultation answers from the public booking form — see src/lib/intake.ts.
+  intake Json?
+
   // Reminder tracking (Phase 5) — set once each reminder actually sends, so
   // the reminder cron job never double-sends if it runs more than once.
+  reminder72SentAt      DateTime?
+  reminderMorningSentAt DateTime?
   reminder24SentAt DateTime?
   reminder2SentAt  DateTime?
 

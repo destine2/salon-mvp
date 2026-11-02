@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyTransaction } from "@/lib/paystack";
+import { sendBookingConfirmed } from "@/lib/notifications";
 import { findSalonIdByAppointmentId, withTenant } from "@/lib/tenant";
 
 // Public, unauthenticated — where the customer's browser lands after paying
@@ -56,6 +57,8 @@ export async function GET(req: NextRequest) {
       data: { status: "BOOKED", holdExpiresAt: null },
     });
   });
+
+  await sendBookingConfirmed(salonId, appointment.id);
 
   return NextResponse.json({ ok: true });
 }

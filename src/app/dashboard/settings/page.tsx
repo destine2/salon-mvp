@@ -5,6 +5,10 @@ import Link from "next/link";
 
 export default function SettingsPage() {
   const [depositPercent, setDepositPercent] = useState("0");
+  const [notifyEmail, setNotifyEmail] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMessage, setEmailMessage] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +20,7 @@ export default function SettingsPage() {
       .then((data) => {
         if (!data.ok) throw new Error(data.error ?? "Could not load settings");
         setDepositPercent(String(data.salon.depositPercent));
+        setNotifyEmail(data.salon.notifyEmail ?? "");
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Something went wrong"))
       .finally(() => setLoading(false));
@@ -43,6 +48,27 @@ export default function SettingsPage() {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveEmail(e: FormEvent) {
+    e.preventDefault();
+    setEmailError(null);
+    setEmailMessage(null);
+    setEmailSaving(true);
+    try {
+      const res = await fetch("/api/salon", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notifyEmail }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "Could not save");
+      setEmailMessage(notifyEmail ? `Saved. New-booking alerts will go to ${notifyEmail}.` : "Saved. Booking alerts are off.");
+    } catch (err) {
+      setEmailError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setEmailSaving(false);
     }
   }
 
@@ -84,6 +110,28 @@ export default function SettingsPage() {
 
           {error && <p className="error-text" style={{ marginTop: "var(--space-3)" }}>{error}</p>}
           {message && <p style={{ color: "var(--color-success)", marginTop: "var(--space-3)" }}>{message}</p>}
+        </div>
+      )}
+
+      {!loading && (
+        <div className="card" style={{ maxWidth: 420, marginTop: "var(--space-4)" }}>
+          <h2 style={{ marginBottom: "var(--space-1)" }}>Booking alerts</h2>
+          <p>
+            We email this address every time a customer books, with who, what and when. Customers who give an email
+            address also get a confirmation and reminders (3 days before, 1 day before, the morning of, and 2 hours
+            before).
+          </p>
+          <form onSubmit={handleSaveEmail}>
+            <label className="field">
+              <span className="field-label">Alert email</span>
+              <input type="email" value={notifyEmail} onChange={(e) => setNotifyEmail(e.target.value)} placeholder="you@example.com" className="input" />
+            </label>
+            <button type="submit" disabled={emailSaving} className="btn btn-primary">
+              {emailSaving ? "Saving…" : "Save"}
+            </button>
+          </form>
+          {emailError && <p className="error-text" style={{ marginTop: "var(--space-3)" }}>{emailError}</p>}
+          {emailMessage && <p style={{ color: "var(--color-success)", marginTop: "var(--space-3)" }}>{emailMessage}</p>}
         </div>
       )}
     </main>
